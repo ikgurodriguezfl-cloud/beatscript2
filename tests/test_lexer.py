@@ -128,7 +128,9 @@ def test_durations():
     section("Duraciones musicales")
     durations = [
         "redonda", "blanca", "negra",
-        "corchea", "semicorchea", "fusa", "semifusa"
+        "corchea", "semicorchea", "fusa", "semifusa",
+        "redonda_punto", "blanca_punto", "negra_punto",
+        "corchea_punto", "semicorchea_punto", "fusa_punto", "semifusa_punto",
     ]
     for d in durations:
         assert_tokens(d, ["DURATION"], label=d)
@@ -137,6 +139,7 @@ def test_durations():
 def test_note_with_duration():
     section("Nota + duración")
     assert_tokens("C4 negra",    ["NOTE", "DURATION"])
+    assert_tokens("C4 negra_punto", ["NOTE", "DURATION"])
     assert_tokens("D#4 blanca",  ["NOTE", "DURATION"])
     assert_tokens("Eb3 corchea", ["NOTE", "DURATION"])
     assert_tokens("G4 redonda",  ["NOTE", "DURATION"])
@@ -198,9 +201,9 @@ def test_chord_block():
 
 def test_comments_ignored():
     section("Comentarios (deben ignorarse)")
-    assert_tokens("# esto es un comentario", [])
-    assert_tokens("# comentario\ntempo 120", ["TEMPO_KW", "NUMBER"])
-    assert_tokens("tempo 120 # inline",      ["TEMPO_KW", "NUMBER"])
+    assert_tokens("## esto es un comentario", [])
+    assert_tokens("## comentario\ntempo 120", ["TEMPO_KW", "NUMBER"])
+    assert_tokens("tempo 120 ## inline",      ["TEMPO_KW", "NUMBER"])
 
 
 def test_multiline_program():

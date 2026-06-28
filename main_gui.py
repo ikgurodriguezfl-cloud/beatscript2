@@ -543,12 +543,16 @@ class BeatScriptIDE(ctk.CTk):
         "TRANSPOSE_KW":  "hl_keyword",
         "COMPAS_KW":     "hl_keyword",
         "ACCENT_KW":     "hl_keyword",
+        "SEQUENCE_KW":   "hl_keyword",
         "NOTE":          "hl_note",
         "DURATION":      "hl_duration",
         "INSTR_NAME":    "hl_instrument",
         "NUMBER":        "hl_number",
         "LBRACE":        "hl_brace",
         "RBRACE":        "hl_brace",
+        "LPAREN":        "hl_brace",
+        "RPAREN":        "hl_brace",
+        "COMMA":         "hl_brace",
         "IDENTIFIER":    "hl_identifier",
     }
 
@@ -590,7 +594,7 @@ class BeatScriptIDE(ctk.CTk):
         inner.tag_remove("hl_comment", "1.0", "end")
 
         # Paso 1: colorear comentarios con regex (el lexer los descarta)
-        for m in re.finditer(r"#[^\n]*", source):
+        for m in re.finditer(r"##[^\n]*", source):
             start = f"1.0 + {m.start()} chars"
             end   = f"1.0 + {m.end()} chars"
             inner.tag_add("hl_comment", start, end)
@@ -914,7 +918,7 @@ class BeatScriptIDE(ctk.CTk):
                     avisos.append(
                         f"[ERROR LÉXICO] Línea {siguiente.lineno}, Col {col}: "
                         f"'{siguiente.value}' no es una duración válida — usa: "
-                        f"negra, blanca, corchea, redonda, semicorchea, fusa, semifusa"
+                        f"negra, blanca, corchea, redonda, semicorchea, fusa, semifusa o *_punto"
                     )
 
             elif tok.type == "IDENTIFIER":
@@ -1113,7 +1117,7 @@ class BeatScriptIDE(ctk.CTk):
         tarjeta(
             "ERR-VAL-02", "Tipo de Dato Duracion Desconocido",
             causa="Se esperaba un valor de la enumeracion de duraciones (negra, blanca, etc.) pero se recibio un string no reconocido. Ej: blancaa, negra1",
-            resolucion="Usar: negra | blanca | corchea | redonda | semicorchea | fusa | semifusa",
+            resolucion="Usar: negra | blanca | corchea | redonda | semicorchea | fusa | semifusa, o agregar _punto",
         )
 
         # ── Seccion 2: Lexico ─────────────────────────────────────────────────
@@ -1217,7 +1221,7 @@ class BeatScriptIDE(ctk.CTk):
 
     def _cargar_ejemplo(self):
         ejemplo = """\
-# Oda a la Alegría — BeatScript
+## Oda a la Alegría — BeatScript
 tempo 110
 volume 80
 

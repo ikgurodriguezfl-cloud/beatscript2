@@ -55,6 +55,7 @@ RESERVED: dict[str, str] = {
     "transpose"   : "TRANSPOSE_KW",
     "compas"      : "COMPAS_KW",
     "acento"      : "ACCENT_KW",
+    "secuencia"   : "SEQUENCE_KW",
 
     # Duraciones musicales
     "redonda"     : "DURATION",
@@ -64,6 +65,13 @@ RESERVED: dict[str, str] = {
     "semicorchea" : "DURATION",
     "fusa"        : "DURATION",
     "semifusa"    : "DURATION",
+    "redonda_punto"     : "DURATION",
+    "blanca_punto"      : "DURATION",
+    "negra_punto"       : "DURATION",
+    "corchea_punto"     : "DURATION",
+    "semicorchea_punto" : "DURATION",
+    "fusa_punto"        : "DURATION",
+    "semifusa_punto"    : "DURATION",
 
     # Instrumentos MIDI — cuerdas
     "piano"       : "INSTR_NAME",
@@ -127,6 +135,7 @@ tokens = (
     "TRANSPOSE_KW",
     "COMPAS_KW",
     "ACCENT_KW",
+    "SEQUENCE_KW",
     "NOTE",
     "DURATION",
     "INSTR_NAME",
@@ -134,6 +143,9 @@ tokens = (
     "IDENTIFIER",
     "LBRACE",
     "RBRACE",
+    "LPAREN",
+    "RPAREN",
+    "COMMA",
 )
 
 # ---------------------------------------------------------------------------
@@ -157,6 +169,9 @@ tokens = (
 # El { se escapa con \ porque en regex { inicia un cuantificador.
 t_LBRACE = r"\{"
 t_RBRACE = r"\}"
+t_LPAREN = r"\("
+t_RPAREN = r"\)"
+t_COMMA = r","
 
 # --- Nota musical (función = alta prioridad) -----------------
 # Regex: [A-Ga-g][#b]?[0-9]
@@ -211,9 +226,9 @@ def t_IDENTIFIER(t):
 
 
 # --- Comentarios (ignorados, no generan token) ---------------
-# Regex: #[^\n]*
+# Regex: ##[^\n]*
 def t_COMMENT(t):
-    r"\#[^\n]*"
+    r"\#\#[^\n]*"
     # Los comentarios no generan token: la función no retorna nada,
     # por lo que PLY descarta el lexema silenciosamente.
     pass
@@ -289,7 +304,7 @@ _ERROR_HINTS: dict[str, str] = {
     ">":  "El operador '>' no existe en BeatScript.",
     ",":  "Separa notas con espacios, no con comas: C4 E4 G4 blanca",
     ".":  "El '.' no es válido — BeatScript no usa decimales.",
-    "/":  "Para comentarios usa '#', no '/' ni '//'.",
+    "/":  "Para comentarios usa '##', no '/' ni '//'.",
     "\\":  "El '\\' no es válido en BeatScript.",
     "|":  "El '|' no es válido en BeatScript.",
     "~":  "El '~' no es válido en BeatScript.",
@@ -410,7 +425,7 @@ def _print_token_table(token_list: list, source: str = "") -> None:
 
 if __name__ == "__main__":
     SAMPLE = """\
-# ---- Ejemplo completo BeatScript ----
+## ---- Ejemplo completo BeatScript ----
 tempo 120
 
 instrument piano

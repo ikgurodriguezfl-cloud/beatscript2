@@ -12,6 +12,13 @@ DURATION_BEATS = {
     "semicorchea": 0.25,
     "fusa": 0.125,
     "semifusa": 0.0625,
+    "redonda_punto": 6.0,
+    "blanca_punto": 3.0,
+    "negra_punto": 1.5,
+    "corchea_punto": 0.75,
+    "semicorchea_punto": 0.375,
+    "fusa_punto": 0.1875,
+    "semifusa_punto": 0.09375,
 }
 
 INSTRUMENT_PROGRAM = {
@@ -78,6 +85,10 @@ def _collect_block(tokens: list, start: int):
 def _count_tracks(token_groups: list[list]) -> int:
     count = 0
     for tokens in token_groups:
+        sequence = _sequence_groups(tokens)
+        if sequence:
+            count += sum(len(group) for group in sequence)
+            continue
         tracks = sum(1 for tok in tokens if tok.type == "TRACK_KW")
         count += tracks if tracks else 1
     return max(1, count)
@@ -86,6 +97,55 @@ def _count_tracks(token_groups: list[list]) -> int:
 def _next_channel(track_index: int) -> int:
     channel = track_index % 15
     return channel if channel < 9 else channel + 1
+
+
+def _track_definitions(tokens: list) -> dict:
+    definitions = {}
+    j = 0
+    while j < len(tokens):
+        if tokens[j].type == "TRACK_KW":
+            name_tok = tokens[j + 1] if j + 1 < len(tokens) else None
+            k = j + 2
+            while k < len(tokens) and tokens[k].type != "LBRACE":
+                k += 1
+            if name_tok and name_tok.type == "IDENTIFIER" and k < len(tokens):
+                block, end = _collect_block(tokens, k + 1)
+                definitions[name_tok.value] = block
+                j = end
+                continue
+        j += 1
+    return definitions
+
+
+def _sequence_groups(tokens: list) -> list[list[str]]:
+    groups = []
+    j = 0
+    while j < len(tokens):
+        if tokens[j].type == "SEQUENCE_KW":
+            k = j + 1
+            while k < len(tokens) and tokens[k].type != "LBRACE":
+                k += 1
+            if k >= len(tokens):
+                return groups
+            block, _ = _collect_block(tokens, k + 1)
+            p = 0
+            while p < len(block):
+                tok = block[p]
+                if tok.type == "LPAREN":
+                    p += 1
+                    group = []
+                    while p < len(block) and block[p].type != "RPAREN":
+                        if block[p].type == "IDENTIFIER":
+                            group.append(block[p].value)
+                        p += 1
+                    if group:
+                        groups.append(group)
+                elif tok.type == "IDENTIFIER":
+                    groups.append([tok.value])
+                p += 1
+            return groups
+        j += 1
+    return groups
 
 
 def tokens_to_midi_documents(token_groups: list[list], output_path: str = "output.mid") -> str:
@@ -229,6 +289,8 @@ def tokens_to_midi_documents(token_groups: list[list], output_path: str = "outpu
         doc_velocity = 80
         doc_pan = 64
         doc_has_track = any(tok.type == "TRACK_KW" for tok in tokens)
+        sequence = _sequence_groups(tokens)
+        definitions = _track_definitions(tokens)
 
         while j < len(tokens):
             tok = tokens[j]
@@ -251,8 +313,18 @@ def tokens_to_midi_documents(token_groups: list[list], output_path: str = "outpu
                 doc_pan = max(0, min(127, tokens[j + 1].value))
                 j += 2
                 continue
+            if tok.type == "SEQUENCE_KW":
+                break
 
             if tok.type == "TRACK_KW":
+                if sequence:
+                    k = j + 1
+                    while k < len(tokens) and tokens[k].type != "LBRACE":
+                        k += 1
+                    if k < len(tokens):
+                        _, end = _collect_block(tokens, k + 1)
+                        j = end
+                        continue
                 k = j + 1
                 while k < len(tokens) and tokens[k].type != "LBRACE":
                     k += 1
@@ -269,6 +341,28 @@ def tokens_to_midi_documents(token_groups: list[list], output_path: str = "outpu
                     continue
 
             j += 1
+
+        if sequence:
+            sequence_time = 0.0
+            for group in sequence:
+                group_end = sequence_time
+                for name in group:
+                    block = definitions.get(name)
+                    if block is None:
+                        continue
+                    track = next_track
+                    channel = _next_channel(track)
+                    midi.addTempo(track, 0, tempo)
+                    midi.addProgramChange(track, channel, 0, doc_program)
+                    add_pan(track, channel, 0, doc_pan)
+                    end_time = process(
+                        block, track, channel, sequence_time,
+                        doc_program, doc_velocity, doc_pan
+                    )[0]
+                    group_end = max(group_end, end_time)
+                    next_track += 1
+                sequence_time = group_end
+            continue
 
         if not doc_has_track:
             track = next_track

@@ -193,6 +193,15 @@ class Accent(ASTNode):
         return f"Accent({self.velocity if self.velocity is not None else 'auto'})"
 
 
+class Sequence(ASTNode):
+    """Sentencia: secuencia { (track1, track2), track3 }"""
+    def __init__(self, groups):
+        self.groups = groups
+
+    def __repr__(self):
+        return f"Sequence({len(self.groups)} pasos)"
+
+
 # 2. PARSER RECURSIVO DESCENDENTE
 
 class BeatScriptParser:
@@ -370,6 +379,8 @@ class BeatScriptParser:
             return self._parse_instrument()
         elif self._check("TRACK_KW"):
             return self._parse_track()
+        elif self._check("SEQUENCE_KW"):
+            return self._parse_sequence()
         elif self._check("CHORD_KW"):
             return self._parse_chord()
         elif self._check("REPEAT_KW"):
@@ -401,7 +412,7 @@ class BeatScriptParser:
                 )
             self._synchronize({
                 "TEMPO_KW", "VOLUME_KW", "INSTRUMENT_KW",
-                "TRACK_KW", "REPEAT_KW", "PAN_KW", "TRANSPOSE_KW", "COMPAS_KW", "ACCENT_KW",
+                "TRACK_KW", "SEQUENCE_KW", "REPEAT_KW", "PAN_KW", "TRANSPOSE_KW", "COMPAS_KW", "ACCENT_KW",
             })
             return None
 
@@ -468,6 +479,48 @@ class BeatScriptParser:
         if name_token:
             return Track(name_token.value, events)
         return None
+
+    def _parse_sequence(self):
+        """Parsea: secuencia { (track1, track2), track3 }"""
+        self._consume("SEQUENCE_KW")
+        self._consume("LBRACE", "Se esperaba '{' despues de 'secuencia'")
+
+        groups = []
+        while not self._check("RBRACE") and not self._is_at_end():
+            group = self._parse_sequence_group()
+            if group:
+                groups.append(group)
+            if self._check("COMMA"):
+                self._consume("COMMA")
+            elif not self._check("RBRACE"):
+                current = self._current_token()
+                if current:
+                    self._add_error("Se esperaba ',' o '}' dentro de secuencia", token=current)
+                    self._synchronize({"COMMA", "RBRACE"})
+
+        self._consume("RBRACE", "Se esperaba '}'")
+        return Sequence(groups)
+
+    def _parse_sequence_group(self):
+        if self._check("LPAREN"):
+            self._consume("LPAREN")
+            names = []
+            while not self._check("RPAREN") and not self._is_at_end():
+                name_token = self._consume("IDENTIFIER", "Se esperaba nombre de track en secuencia")
+                if name_token:
+                    names.append(name_token.value)
+                if self._check("COMMA"):
+                    self._consume("COMMA")
+                elif not self._check("RPAREN"):
+                    current = self._current_token()
+                    if current:
+                        self._add_error("Se esperaba ',' o ')' dentro del grupo paralelo", token=current)
+                        self._synchronize({"COMMA", "RPAREN"})
+            self._consume("RPAREN", "Se esperaba ')'")
+            return names
+
+        name_token = self._consume("IDENTIFIER", "Se esperaba nombre de track en secuencia")
+        return [name_token.value] if name_token else []
 
     def _parse_chord(self):
         """
@@ -730,6 +783,12 @@ def ast_to_table_rows(node, parent_id=""):
     elif isinstance(node, Note):
         rows.append((parent_id, f"Note {node.pitch}", ("Nota", "Evento", f"{node.pitch} ({node.duration})"), "leaf"))
 
+    elif isinstance(node, Sequence):
+        sequence_id = "Sequence"
+        rows.append((parent_id, sequence_id, ("Secuencia", "Control", f"{len(node.groups)} pasos"), "expandable"))
+        for i, group in enumerate(node.groups, 1):
+            rows.append((sequence_id, f"Sequence {i}", ("Paso", "Paralelo" if len(group) > 1 else "Track", " + ".join(group)), "leaf"))
+
     elif isinstance(node, Rest):
         rows.append((parent_id, f"Rest {node.duration}", ("Silencio", "Evento", node.duration), "leaf"))
 
@@ -815,6 +874,14 @@ def ast_to_tree_string(node, indent="", is_last=True):
             connector = "└── " if is_last_event else "├── "
             tree_str = ast_to_tree_string(event, indent + extension, is_last_event)
             lines.append(indent + connector + tree_str)
+
+    elif isinstance(node, Sequence):
+        lines.append("Secuencia")
+        for i, group in enumerate(node.groups):
+            is_last_group = (i == len(node.groups) - 1)
+            connector = "└── " if is_last_group else "├── "
+            label = " + ".join(group) if len(group) > 1 else group[0]
+            lines.append(indent + connector + f"Paso {i + 1}: {label}")
 
     elif isinstance(node, Note):
         return f"Nota: {node.pitch} ({node.duration})"
@@ -977,6 +1044,7 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
         if isinstance(node, Pan):        return _v_pan(node)
         if isinstance(node, Instrument): return _v_instrument(node)
         if isinstance(node, Track):      return _v_track(node)
+        if isinstance(node, Sequence):   return _v_sequence(node)
         if isinstance(node, Note):       return _v_note(node)
         if isinstance(node, Rest):       return _v_rest(node)
         if isinstance(node, Chord):      return _v_chord(node)
@@ -1050,6 +1118,19 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
             if hijo:
                 arco(ev_nid, hijo)
 
+        arco(nid, nodo_terminal("RBRACE", "}", "#455a64"))
+        return nid
+
+    def _v_sequence(node):
+        nid = nodo_regla("sentencia\nsecuencia", "#263238")
+        arco(nid, nodo_terminal("SEQUENCE_KW", "secuencia", "#00695c"))
+        arco(nid, nodo_terminal("LBRACE", "{", "#455a64"))
+        body_nid = nodo_lista(f"pasos\n({len(node.groups)})")
+        arco(nid, body_nid)
+        for i, group in enumerate(node.groups, 1):
+            label = " + ".join(group) if len(group) > 1 else group[0]
+            step_nid = nodo_regla(f"paso {i}\n{label}", "#37474f")
+            arco(body_nid, step_nid)
         arco(nid, nodo_terminal("RBRACE", "}", "#455a64"))
         return nid
 

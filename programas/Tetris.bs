@@ -1,0 +1,159 @@
+instrument flute
+
+track melodia {
+    ## Ciclo infinito de Tetris (2 repeticiones completas de la obra)
+    repeat 2 {
+        ## --- PARTE A ---
+        E5 negra
+        B4 corchea
+        C5 corchea
+        D5 negra
+        C5 corchea
+        B4 corchea
+        
+        A4 negra
+        A4 corchea
+        C5 corchea
+        E5 negra
+        D5 corchea
+        C5 corchea
+        
+        B4 negra_punto
+        C5 corchea
+        D5 negra
+        E5 negra
+        
+        C5 negra
+        A4 negra
+        A4 negra
+        rest negra
+
+        ## --- PARTE B ---
+        acento 127 {
+            D5 negra_punto
+        }
+        F5 corchea
+        A5 negra
+        G5 corchea
+        F5 corchea
+        
+        E5 negra_punto
+        C5 corchea
+        E5 negra
+        D5 corchea
+        C5 corchea
+        
+        B4 negra
+        B4 corchea
+        C5 corchea
+        D5 negra
+        E5 negra
+        
+        C5 negra
+        A4 negra
+        A4 negra
+        rest negra
+    }
+}
+
+## ---------------------------------------------------------------------
+## PISTA 2: Armonía (Acordes de acompañamiento a contratiempo)
+## ---------------------------------------------------------------------
+instrument harpsichord
+
+track armonia {
+    repeat 2 {
+        ## --- PARTE A (Armonía) ---
+        rest corchea
+        chord { E4 G#4 corchea }
+        rest corchea
+        chord { E4 G#4 corchea }
+        
+        rest corchea
+        chord { E4 A4 corchea }
+        rest corchea
+        chord { E4 A4 corchea }
+        
+        rest corchea
+        chord { E4 G#4 corchea }
+        rest corchea
+        chord { E4 G#4 corchea }
+        
+        rest corchea
+        chord { E4 A4 corchea }
+        chord { E4 A4 negra }
+        
+        ## --- PARTE B (Armonía) ---
+        rest corchea
+        chord { F4 A4 corchea }
+        rest corchea
+        chord { F4 A4 corchea }
+        
+        rest corchea
+        chord { E4 A4 corchea }
+        rest corchea
+        chord { E4 A4 corchea }
+        
+        rest corchea
+        chord { E4 G#4 corchea }
+        rest corchea
+        chord { E4 G#4 corchea }
+        
+        rest corchea
+        chord { E4 A4 corchea }
+        chord { E4 A4 negra }
+    }
+}
+
+## ---------------------------------------------------------------------
+## PISTA 3: Bajo (Walking Bass ruso)
+## ---------------------------------------------------------------------
+instrument contrabass
+
+track bajo {
+    repeat 2 {
+        ## --- PARTE A (Bajo) ---
+        E3 negra
+        E2 negra
+        E3 negra
+        E2 negra
+        
+        A2 negra
+        E2 negra
+        A2 negra
+        E2 negra
+        
+        E3 negra
+        E2 negra
+        E3 negra
+        E2 negra
+        
+        A2 negra
+        A2 corchea
+        B2 corchea
+        C3 corchea
+        C#3 corchea
+        
+        ## --- PARTE B (Bajo) ---
+        D3 negra
+        A2 negra
+        D3 negra
+        A2 negra
+        
+        C3 negra
+        A2 negra
+        C3 negra
+        A2 negra
+        
+        E3 negra
+        E2 negra
+        E3 negra
+        E2 negra
+        
+        A2 negra
+        E2 negra
+        A2 negra
+        rest negra
+    }
+}
+
