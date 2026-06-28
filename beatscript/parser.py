@@ -13,7 +13,7 @@ Gramática (Notación EBNF):
   track       ::= 'track' identificador '{' (evento)* '}'
   chord       ::= 'chord' '{' NOTE+ DURATION '}'
   transpose   ::= 'transpose' numero '{' (evento)* '}'
-  evento      ::= nota duracion | rest duracion | chord | pan | repeat numero '{' (evento)* '}' | transpose
+  evento ::= nota duracion | rest duracion | chord | pan | volume | repeat numero '{' (evento)* '}' | transpose
   nota        ::= NOTE
   rest        ::= 'rest'
   duracion    ::= DURATION
@@ -366,6 +366,8 @@ class BeatScriptParser:
             return self._parse_compas()
         elif self._check("PAN_KW"):
             return self._parse_pan()
+        elif self._check("VOLUME_KW"):
+            return self._parse_volume()
         elif self._check("INSTRUMENT_KW"):
             return self._parse_instrument()
         elif self._check("TRACK_KW"):
@@ -450,13 +452,12 @@ class BeatScriptParser:
         if instr_token:
             return Instrument(instr_token.value)
         return None
-
     def _parse_track(self):
         """Parsea: track <identificador> { <eventos> }"""
         self._consume("TRACK_KW")
         name_token = self._consume("IDENTIFIER", "Se esperaba un nombre de track")
         self._consume("LBRACE", "Se esperaba '{'")
-
+    
         events = []
         while not self._check("RBRACE") and not self._is_at_end():
             event = self._parse_event()
@@ -583,6 +584,10 @@ class BeatScriptParser:
             return self._parse_transpose_event()
         elif self._check("ACCENT_KW"):
             return self._parse_accent_event()
+        elif self._check("INSTRUMENT_KW"):
+            return self._parse_instrument()
+        elif self._check("VOLUME_KW"):
+            return self._parse_volume()
         else:
             # Token inesperado: reportar error con columna y sugerencias
             if current.type == "IDENTIFIER":
@@ -606,7 +611,8 @@ class BeatScriptParser:
                     token=current,
                 )
             self._synchronize({
-                "NOTE", "REST", "REPEAT_KW", "TRANSPOSE_KW", "ACCENT_KW", "PAN_KW", "RBRACE",
+                "NOTE", "REST", "REPEAT_KW", "TRANSPOSE_KW", "ACCENT_KW", 
+                "PAN_KW", "VOLUME_KW", "INSTRUMENT_KW", "RBRACE",
             })
             return None
 

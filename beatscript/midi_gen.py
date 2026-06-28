@@ -6,10 +6,15 @@ NOTE_SEMITONES = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 
 DURATION_BEATS = {
     "redonda": 4.0,
+    "redonda_punto": 6.0,
     "blanca": 2.0,
+    "blanca_punto": 3.0,
     "negra": 1.0,
+    "negra_punto": 1.5,
     "corchea": 0.5,
+    "corchea_punto": 0.75,
     "semicorchea": 0.25,
+    "semicorchea_punto": 0.375,
     "fusa": 0.125,
     "semifusa": 0.0625,
 }
@@ -125,6 +130,7 @@ def tokens_to_midi_documents(token_groups: list[list], output_path: str = "outpu
             elif tok.type == "INSTRUMENT_KW":
                 if j + 1 < len(tok_list) and tok_list[j + 1].type == "INSTR_NAME":
                     program = INSTRUMENT_PROGRAM.get(tok_list[j + 1].value, 0)
+                    
                     midi.addProgramChange(track, channel, time, program)
                     j += 2
                     continue

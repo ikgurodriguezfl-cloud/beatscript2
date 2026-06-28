@@ -56,14 +56,19 @@ RESERVED: dict[str, str] = {
     "compas"      : "COMPAS_KW",
     "acento"      : "ACCENT_KW",
 
-    # Duraciones musicales
-    "redonda"     : "DURATION",
-    "blanca"      : "DURATION",
-    "negra"       : "DURATION",
-    "corchea"     : "DURATION",
-    "semicorchea" : "DURATION",
-    "fusa"        : "DURATION",
-    "semifusa"    : "DURATION",
+# Duraciones musicales (¡AQUÍ AGREGAMOS LAS NUEVAS!)
+    "redonda"           : "DURATION",
+    "redonda_punto"     : "DURATION",
+    "blanca"            : "DURATION",
+    "blanca_punto"      : "DURATION",
+    "negra"             : "DURATION",
+    "negra_punto"       : "DURATION",
+    "corchea"           : "DURATION",
+    "corchea_punto"     : "DURATION",
+    "semicorchea"       : "DURATION",
+    "semicorchea_punto" : "DURATION",
+    "fusa"              : "DURATION",
+    "semifusa"          : "DURATION",
 
     # Instrumentos MIDI — cuerdas
     "piano"       : "INSTR_NAME",
