@@ -1,0 +1,26 @@
+# Vals en 3/4
+tempo 150
+compas 3 4
+volume 85
+instrument piano
+
+track bajo_vals{
+C3 negra
+    chord { E3 G3 C4 negra }
+    chord { E3 G3 C4 negra }
+
+    A2 negra
+    chord { E3 A3 C4 negra }
+    chord { E3 A3 C4 negra }
+
+    F2 negra
+    chord { F3 A3 C4 negra }
+    chord { F3 A3 C4 negra }
+
+    G2 negra
+    chord { D3 G3 B3 negra }
+    chord { D3 G3 B3 negra }
+
+    C3 blanca
+    rest negra
+}

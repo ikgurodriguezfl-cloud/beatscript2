@@ -1,0 +1,28 @@
+# Vals en 3/4
+tempo 150
+compas 3 4
+volume 85
+instrument piano
+
+track melodia_vals {
+    C4 negra
+    E4 negra
+    G4 negra
+
+    A4 negra
+    G4 negra
+    E4 negra
+
+    F4 negra
+    A4 negra
+    C5 negra
+
+    B4 negra
+    G4 negra
+    E4 negra
+
+    C4 blanca
+    rest negra
+}
+
+    

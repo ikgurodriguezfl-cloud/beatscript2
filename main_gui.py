@@ -541,6 +541,8 @@ class BeatScriptIDE(ctk.CTk):
         "VOLUME_KW":     "hl_keyword",
         "PAN_KW":        "hl_keyword",
         "TRANSPOSE_KW":  "hl_keyword",
+        "COMPAS_KW":     "hl_keyword",
+        "ACCENT_KW":     "hl_keyword",
         "NOTE":          "hl_note",
         "DURATION":      "hl_duration",
         "INSTR_NAME":    "hl_instrument",
@@ -877,6 +879,26 @@ class BeatScriptIDE(ctk.CTk):
                             f"usa un valor entre 0 y 127"
                         )
 
+            elif tok.type == "COMPAS_KW":
+                numerador = tokens[i + 1] if i + 1 < len(tokens) else None
+                denominador = tokens[i + 2] if i + 2 < len(tokens) else None
+                if numerador and numerador.type == "NUMBER" and denominador and denominador.type == "NUMBER":
+                    if numerador.value <= 0 or denominador.value <= 0:
+                        col = self._calcular_columna(source, tok)
+                        avisos.append(
+                            f"[ERROR LEXICO] Linea {tok.lineno}, Col {col}: "
+                            "compas requiere valores mayores a 0, ej: compas 4 4"
+                        )
+
+            elif tok.type == "ACCENT_KW":
+                siguiente = tokens[i + 1] if i + 1 < len(tokens) else None
+                if siguiente and siguiente.type == "NUMBER" and not (0 <= siguiente.value <= 127):
+                    col = self._calcular_columna(source, siguiente)
+                    avisos.append(
+                        f"[ERROR LEXICO] Linea {siguiente.lineno}, Col {col}: "
+                        f"acento {siguiente.value} fuera de rango - usa un valor entre 0 y 127"
+                    )
+
             elif tok.type in ("NOTE", "REST"):
                 siguiente = tokens[i + 1] if i + 1 < len(tokens) else None
                 if siguiente and siguiente.type == "NUMBER":
@@ -897,8 +919,10 @@ class BeatScriptIDE(ctk.CTk):
 
             elif tok.type == "IDENTIFIER":
                 val = tok.value
+                anterior = tokens[i - 1] if i > 0 else None
                 # Detecta posibles notas mal formadas (ej. "C4x", "D##3")
-                if re.match(r"^[A-Ga-g].+\d$", val):
+                parece_nota = re.match(r"^[A-Ga-g](?:[#b]{0,2}\d+[A-Za-z0-9#b]*|[#b]{2,}\d*)$", val)
+                if parece_nota and not (anterior and anterior.type == "TRACK_KW"):
                     col = self._calcular_columna(source, tok)
                     avisos.append(
                         f"[ERROR LÉXICO] Línea {tok.lineno}, Col {col}: "

@@ -86,6 +86,16 @@ class Volume(ASTNode):
         return f"Volume({self.level})"
 
 
+class Compas(ASTNode):
+    """Sentencia: compas <numerador> <denominador>"""
+    def __init__(self, numerator, denominator):
+        self.numerator = numerator
+        self.denominator = denominator
+
+    def __repr__(self):
+        return f"Compas({self.numerator}/{self.denominator})"
+
+
 class Pan(ASTNode):
     """Sentencia/Evento: pan <numero>"""
     def __init__(self, value):
@@ -171,6 +181,16 @@ class Transpose(ASTNode):
 
     def __repr__(self):
         return f"Transpose({self.semitones})"
+
+
+class Accent(ASTNode):
+    """Evento/Sentencia: acento [velocidad] { eventos }"""
+    def __init__(self, velocity, events):
+        self.velocity = velocity
+        self.events = events
+
+    def __repr__(self):
+        return f"Accent({self.velocity if self.velocity is not None else 'auto'})"
 
 
 # 2. PARSER RECURSIVO DESCENDENTE
@@ -342,6 +362,8 @@ class BeatScriptParser:
             return self._parse_tempo()
         elif self._check("VOLUME_KW"):
             return self._parse_volume()
+        elif self._check("COMPAS_KW"):
+            return self._parse_compas()
         elif self._check("PAN_KW"):
             return self._parse_pan()
         elif self._check("INSTRUMENT_KW"):
@@ -354,6 +376,8 @@ class BeatScriptParser:
             return self._parse_repeat_statement()
         elif self._check("TRANSPOSE_KW"):
             return self._parse_transpose_statement()
+        elif self._check("ACCENT_KW"):
+            return self._parse_accent_statement()
         else:
             # Token inesperado: reportar error con columna y sugerencias
             if current.type == "IDENTIFIER":
@@ -377,7 +401,7 @@ class BeatScriptParser:
                 )
             self._synchronize({
                 "TEMPO_KW", "VOLUME_KW", "INSTRUMENT_KW",
-                "TRACK_KW", "REPEAT_KW", "PAN_KW", "TRANSPOSE_KW",
+                "TRACK_KW", "REPEAT_KW", "PAN_KW", "TRANSPOSE_KW", "COMPAS_KW", "ACCENT_KW",
             })
             return None
 
@@ -397,6 +421,16 @@ class BeatScriptParser:
 
         if num_token:
             return Volume(num_token.value)
+        return None
+
+    def _parse_compas(self):
+        """Parsea: compas <numerador> <denominador>"""
+        self._consume("COMPAS_KW")
+        numerator = self._consume("NUMBER", "Se esperaba el numerador despues de 'compas'")
+        denominator = self._consume("NUMBER", "Se esperaba el denominador despues del numerador")
+
+        if numerator and denominator:
+            return Compas(numerator.value, denominator.value)
         return None
 
     def _parse_pan(self):
@@ -509,6 +543,23 @@ class BeatScriptParser:
             return Transpose(semitones_token.value, statements)
         return None
 
+    def _parse_accent_statement(self):
+        """Parsea acento a nivel de sentencia: acento [numero] { <sentencias> }"""
+        self._consume("ACCENT_KW")
+        velocity_token = None
+        if self._check("NUMBER"):
+            velocity_token = self._consume("NUMBER")
+        self._consume("LBRACE", "Se esperaba '{' despues de 'acento'")
+
+        statements = []
+        while not self._check("RBRACE") and not self._is_at_end():
+            stmt = self._parse_statement()
+            if stmt:
+                statements.append(stmt)
+
+        self._consume("RBRACE", "Se esperaba '}'")
+        return Accent(velocity_token.value if velocity_token else None, statements)
+
     # EVENTOS (dentro de tracks)
 
     def _parse_event(self):
@@ -530,6 +581,8 @@ class BeatScriptParser:
             return self._parse_repeat_event()
         elif self._check("TRANSPOSE_KW"):
             return self._parse_transpose_event()
+        elif self._check("ACCENT_KW"):
+            return self._parse_accent_event()
         else:
             # Token inesperado: reportar error con columna y sugerencias
             if current.type == "IDENTIFIER":
@@ -544,7 +597,7 @@ class BeatScriptParser:
                 else:
                     self._add_error(
                         f"'{current.value}' no es válido en este contexto.\n"
-                    f"   (Esperado: nota musical, 'rest', 'chord', 'pan', 'repeat' o 'transpose')",
+                    f"   (Esperado: nota musical, 'rest', 'chord', 'pan', 'repeat', 'transpose' o 'acento')",
                         token=current,
                     )
             else:
@@ -553,7 +606,7 @@ class BeatScriptParser:
                     token=current,
                 )
             self._synchronize({
-                "NOTE", "REST", "REPEAT_KW", "TRANSPOSE_KW", "PAN_KW", "RBRACE",
+                "NOTE", "REST", "REPEAT_KW", "TRANSPOSE_KW", "ACCENT_KW", "PAN_KW", "RBRACE",
             })
             return None
 
@@ -615,6 +668,23 @@ class BeatScriptParser:
             return Transpose(semitones_token.value, events)
         return None
 
+    def _parse_accent_event(self):
+        """Parsea acento a nivel de evento: acento [numero] { <eventos> }"""
+        self._consume("ACCENT_KW")
+        velocity_token = None
+        if self._check("NUMBER"):
+            velocity_token = self._consume("NUMBER")
+        self._consume("LBRACE", "Se esperaba '{' despues de 'acento'")
+
+        events = []
+        while not self._check("RBRACE") and not self._is_at_end():
+            event = self._parse_event()
+            if event:
+                events.append(event)
+
+        self._consume("RBRACE", "Se esperaba '}'")
+        return Accent(velocity_token.value if velocity_token else None, events)
+
 
 # 3. FUNCIÓN DE UTILIDAD PARA CONVERTIR AST A REPRESENTACIÓN DE TABLA
 
@@ -641,6 +711,9 @@ def ast_to_table_rows(node, parent_id=""):
 
     elif isinstance(node, Volume):
         rows.append((parent_id, f"Volume {node.level}", ("Volume", "Comando", f"{node.level}"), "leaf"))
+
+    elif isinstance(node, Compas):
+        rows.append((parent_id, f"Compas {node.numerator}/{node.denominator}", ("Compas", "Comando", f"{node.numerator}/{node.denominator}"), "leaf"))
 
     elif isinstance(node, Pan):
         rows.append((parent_id, f"Pan {node.value}", ("Pan", "Comando", f"{node.value}"), "leaf"))
@@ -676,6 +749,13 @@ def ast_to_table_rows(node, parent_id=""):
         rows.append((parent_id, transpose_id, ("Transpose", "Control", f"+{node.semitones} semitonos"), "expandable"))
         for event in node.events:
             rows.extend(ast_to_table_rows(event, transpose_id))
+
+    elif isinstance(node, Accent):
+        accent_id = f"Accent {node.velocity if node.velocity is not None else 'auto'}"
+        value = f"{node.velocity}" if node.velocity is not None else "+20"
+        rows.append((parent_id, accent_id, ("Acento", "Control", value), "expandable"))
+        for event in node.events:
+            rows.extend(ast_to_table_rows(event, accent_id))
 
     return rows
 
@@ -716,6 +796,9 @@ def ast_to_tree_string(node, indent="", is_last=True):
 
     elif isinstance(node, Volume):
         return f"Volume: {node.level}"
+
+    elif isinstance(node, Compas):
+        return f"Compas: {node.numerator}/{node.denominator}"
 
     elif isinstance(node, Pan):
         return f"Pan: {node.value}"
@@ -762,6 +845,17 @@ def ast_to_tree_string(node, indent="", is_last=True):
         for i, event in enumerate(events):
             is_last_event = (i == len(events) - 1)
             extension = "    " if is_last_event else "â”‚   "
+            connector = "└── " if is_last_event else "├── "
+            tree_str = ast_to_tree_string(event, indent + extension, is_last_event)
+            lines.append(indent + connector + tree_str)
+
+    elif isinstance(node, Accent):
+        label = node.velocity if node.velocity is not None else "+20"
+        lines.append(f"Acento {label}")
+        events = node.events
+        for i, event in enumerate(events):
+            is_last_event = (i == len(events) - 1)
+            extension = "    " if is_last_event else "│   "
             connector = "└── " if is_last_event else "├── "
             tree_str = ast_to_tree_string(event, indent + extension, is_last_event)
             lines.append(indent + connector + tree_str)
@@ -879,6 +973,7 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
         if isinstance(node, Program):    return _v_programa(node)
         if isinstance(node, Tempo):      return _v_tempo(node)
         if isinstance(node, Volume):     return _v_volume(node)
+        if isinstance(node, Compas):     return _v_compas(node)
         if isinstance(node, Pan):        return _v_pan(node)
         if isinstance(node, Instrument): return _v_instrument(node)
         if isinstance(node, Track):      return _v_track(node)
@@ -887,6 +982,7 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
         if isinstance(node, Chord):      return _v_chord(node)
         if isinstance(node, Repeat):     return _v_repeat(node)
         if isinstance(node, Transpose):  return _v_transpose(node)
+        if isinstance(node, Accent):     return _v_accent(node)
         return None
 
     def _v_programa(node):
@@ -916,6 +1012,13 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
         nid = nodo_regla("sentencia\nvolume", "#4527a0")
         arco(nid, nodo_terminal("VOLUME_KW", "volume",       "#6a1b9a"))
         arco(nid, nodo_terminal("NUMBER",    str(node.level), "#37474f"))
+        return nid
+
+    def _v_compas(node):
+        nid = nodo_regla("sentencia\ncompas", "#4527a0")
+        arco(nid, nodo_terminal("COMPAS_KW", "compas", "#6a1b9a"))
+        arco(nid, nodo_terminal("NUMBER", str(node.numerator), "#37474f"))
+        arco(nid, nodo_terminal("NUMBER", str(node.denominator), "#37474f"))
         return nid
 
     def _v_pan(node):
@@ -998,6 +1101,23 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
         nid = nodo_regla("transpose", "#4e342e")
         arco(nid, nodo_terminal("TRANSPOSE_KW", "transpose", "#6d4c41"))
         arco(nid, nodo_terminal("NUMBER", str(node.semitones), "#37474f"))
+        arco(nid, nodo_terminal("LBRACE", "{", "#455a64"))
+
+        body_nid = nodo_lista(f"cuerpo\n({len(node.events)})")
+        arco(nid, body_nid)
+        for event in node.events:
+            hijo = visitar(event)
+            if hijo:
+                arco(body_nid, hijo)
+
+        arco(nid, nodo_terminal("RBRACE", "}", "#455a64"))
+        return nid
+
+    def _v_accent(node):
+        nid = nodo_regla("acento", "#880e4f")
+        arco(nid, nodo_terminal("ACCENT_KW", "acento", "#ad1457"))
+        if node.velocity is not None:
+            arco(nid, nodo_terminal("NUMBER", str(node.velocity), "#37474f"))
         arco(nid, nodo_terminal("LBRACE", "{", "#455a64"))
 
         body_nid = nodo_lista(f"cuerpo\n({len(node.events)})")

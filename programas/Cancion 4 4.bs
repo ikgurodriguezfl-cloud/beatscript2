@@ -1,0 +1,39 @@
+# Cancion en 4/4
+tempo 120
+compas 4 4
+volume 90
+instrument piano
+
+track melodia_4_4 {
+    C4 negra
+    E4 negra
+    G4 negra
+    E4 negra
+
+    F4 negra
+    A4 negra
+    G4 blanca
+
+    C4 negra
+    E4 negra
+    G4 negra
+    C5 negra
+
+    B4 negra
+    G4 negra
+    C5 blanca
+
+
+
+    C3 blanca
+    G2 blanca
+
+    F3 blanca
+    C3 blanca
+
+    C3 blanca
+    G2 blanca
+
+    G2 blanca
+    C3 blanca
+}

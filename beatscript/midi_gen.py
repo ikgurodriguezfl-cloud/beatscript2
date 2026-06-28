@@ -170,6 +170,22 @@ def tokens_to_midi_documents(token_groups: list[list], output_path: str = "outpu
                     j = end
                     continue
 
+            elif tok.type == "ACCENT_KW":
+                accent_velocity, k = None, j + 1
+                if k < len(tok_list) and tok_list[k].type == "NUMBER":
+                    accent_velocity = max(0, min(127, tok_list[k].value))
+                    k += 1
+                while k < len(tok_list) and tok_list[k].type != "LBRACE":
+                    k += 1
+                if k < len(tok_list):
+                    block, end = _collect_block(tok_list, k + 1)
+                    boosted_velocity = accent_velocity if accent_velocity is not None else min(127, velocity + 20)
+                    time, program, _, pan = process(
+                        block, track, channel, time, program, boosted_velocity, pan, transpose
+                    )
+                    j = end
+                    continue
+
             elif tok.type == "CHORD_KW":
                 k = j + 1
                 while k < len(tok_list) and tok_list[k].type != "LBRACE":
@@ -219,6 +235,9 @@ def tokens_to_midi_documents(token_groups: list[list], output_path: str = "outpu
             if tok.type == "TEMPO_KW" and j + 1 < len(tokens) and tokens[j + 1].type == "NUMBER":
                 tempo = tokens[j + 1].value
                 j += 2
+                continue
+            if tok.type == "COMPAS_KW" and j + 2 < len(tokens):
+                j += 3
                 continue
             if tok.type == "INSTRUMENT_KW" and j + 1 < len(tokens) and tokens[j + 1].type == "INSTR_NAME":
                 doc_program = INSTRUMENT_PROGRAM.get(tokens[j + 1].value, 0)

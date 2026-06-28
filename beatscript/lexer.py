@@ -53,6 +53,8 @@ RESERVED: dict[str, str] = {
     "volume"      : "VOLUME_KW",
     "pan"         : "PAN_KW",
     "transpose"   : "TRANSPOSE_KW",
+    "compas"      : "COMPAS_KW",
+    "acento"      : "ACCENT_KW",
 
     # Duraciones musicales
     "redonda"     : "DURATION",
@@ -123,6 +125,8 @@ tokens = (
     "VOLUME_KW",
     "PAN_KW",
     "TRANSPOSE_KW",
+    "COMPAS_KW",
+    "ACCENT_KW",
     "NOTE",
     "DURATION",
     "INSTR_NAME",
