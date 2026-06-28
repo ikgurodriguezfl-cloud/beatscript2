@@ -5,13 +5,15 @@ Parser recursivo descendente → Árbol Sintáctico (AST)
 
 Gramática (Notación EBNF):
   programa    ::= (sentencia)*
-  sentencia   ::= tempo | volume | instrument | track | repeat | chord
+  sentencia   ::= tempo | volume | pan | instrument | track | repeat | chord | transpose
   tempo       ::= 'tempo' numero
   volume      ::= 'volume' numero
+  pan         ::= 'pan' numero
   instrument  ::= 'instrument' instr_name
   track       ::= 'track' identificador '{' (evento)* '}'
   chord       ::= 'chord' '{' NOTE+ DURATION '}'
-  evento      ::= nota duracion | rest duracion | chord | repeat numero '{' (evento)* '}'
+  transpose   ::= 'transpose' numero '{' (evento)* '}'
+  evento      ::= nota duracion | rest duracion | chord | pan | repeat numero '{' (evento)* '}' | transpose
   nota        ::= NOTE
   rest        ::= 'rest'
   duracion    ::= DURATION
@@ -84,6 +86,15 @@ class Volume(ASTNode):
         return f"Volume({self.level})"
 
 
+class Pan(ASTNode):
+    """Sentencia/Evento: pan <numero>"""
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return f"Pan({self.value})"
+
+
 class Instrument(ASTNode):
     """Sentencia: instrument <nombre>"""
     def __init__(self, name):
@@ -150,6 +161,16 @@ class Repeat(ASTNode):
 
     def __repr__(self):
         return f"Repeat({self.count})"
+
+
+class Transpose(ASTNode):
+    """Evento/Sentencia: transpose <semitonos> { eventos }"""
+    def __init__(self, semitones, events):
+        self.semitones = semitones
+        self.events = events
+
+    def __repr__(self):
+        return f"Transpose({self.semitones})"
 
 
 # 2. PARSER RECURSIVO DESCENDENTE
@@ -311,7 +332,7 @@ class BeatScriptParser:
     # SENTENCIAS (nivel superior)
 
     def _parse_statement(self):
-        """Parsea una sentencia principal: tempo, volume, instrument, track, chord, repeat."""
+        """Parsea una sentencia principal: tempo, volume, pan, instrument, track, chord, repeat, transpose."""
         current = self._current_token()
 
         if current is None:
@@ -321,6 +342,8 @@ class BeatScriptParser:
             return self._parse_tempo()
         elif self._check("VOLUME_KW"):
             return self._parse_volume()
+        elif self._check("PAN_KW"):
+            return self._parse_pan()
         elif self._check("INSTRUMENT_KW"):
             return self._parse_instrument()
         elif self._check("TRACK_KW"):
@@ -329,6 +352,8 @@ class BeatScriptParser:
             return self._parse_chord()
         elif self._check("REPEAT_KW"):
             return self._parse_repeat_statement()
+        elif self._check("TRANSPOSE_KW"):
+            return self._parse_transpose_statement()
         else:
             # Token inesperado: reportar error con columna y sugerencias
             if current.type == "IDENTIFIER":
@@ -352,7 +377,7 @@ class BeatScriptParser:
                 )
             self._synchronize({
                 "TEMPO_KW", "VOLUME_KW", "INSTRUMENT_KW",
-                "TRACK_KW", "REPEAT_KW",
+                "TRACK_KW", "REPEAT_KW", "PAN_KW", "TRANSPOSE_KW",
             })
             return None
 
@@ -372,6 +397,15 @@ class BeatScriptParser:
 
         if num_token:
             return Volume(num_token.value)
+        return None
+
+    def _parse_pan(self):
+        """Parsea: pan <numero>"""
+        self._consume("PAN_KW")
+        num_token = self._consume("NUMBER", "Se esperaba un numero despues de 'pan'")
+
+        if num_token:
+            return Pan(num_token.value)
         return None
 
     def _parse_instrument(self):
@@ -457,10 +491,28 @@ class BeatScriptParser:
             return Repeat(count_token.value, statements)
         return None
 
+    def _parse_transpose_statement(self):
+        """Parsea transpose a nivel de sentencia: transpose <numero> { <sentencias> }"""
+        self._consume("TRANSPOSE_KW")
+        semitones_token = self._consume("NUMBER", "Se esperaba un numero despues de 'transpose'")
+        self._consume("LBRACE", "Se esperaba '{'")
+
+        statements = []
+        while not self._check("RBRACE") and not self._is_at_end():
+            stmt = self._parse_statement()
+            if stmt:
+                statements.append(stmt)
+
+        self._consume("RBRACE", "Se esperaba '}'")
+
+        if semitones_token:
+            return Transpose(semitones_token.value, statements)
+        return None
+
     # EVENTOS (dentro de tracks)
 
     def _parse_event(self):
-        """Parsea un evento dentro de un track: nota, rest, chord o repeat."""
+        """Parsea un evento dentro de un track: nota, rest, chord, pan, repeat o transpose."""
         current = self._current_token()
 
         if current is None:
@@ -472,8 +524,12 @@ class BeatScriptParser:
             return self._parse_rest()
         elif self._check("CHORD_KW"):
             return self._parse_chord()
+        elif self._check("PAN_KW"):
+            return self._parse_pan()
         elif self._check("REPEAT_KW"):
             return self._parse_repeat_event()
+        elif self._check("TRANSPOSE_KW"):
+            return self._parse_transpose_event()
         else:
             # Token inesperado: reportar error con columna y sugerencias
             if current.type == "IDENTIFIER":
@@ -488,7 +544,7 @@ class BeatScriptParser:
                 else:
                     self._add_error(
                         f"'{current.value}' no es válido en este contexto.\n"
-                        f"   (Esperado: nota musical, 'rest', 'chord' o 'repeat')",
+                    f"   (Esperado: nota musical, 'rest', 'chord', 'pan', 'repeat' o 'transpose')",
                         token=current,
                     )
             else:
@@ -497,7 +553,7 @@ class BeatScriptParser:
                     token=current,
                 )
             self._synchronize({
-                "NOTE", "REST", "REPEAT_KW", "RBRACE",
+                "NOTE", "REST", "REPEAT_KW", "TRANSPOSE_KW", "PAN_KW", "RBRACE",
             })
             return None
 
@@ -541,6 +597,24 @@ class BeatScriptParser:
             return Repeat(count_token.value, events)
         return None
 
+    def _parse_transpose_event(self):
+        """Parsea transpose a nivel de evento: transpose <numero> { <eventos> }"""
+        self._consume("TRANSPOSE_KW")
+        semitones_token = self._consume("NUMBER", "Se esperaba un numero despues de 'transpose'")
+        self._consume("LBRACE", "Se esperaba '{'")
+
+        events = []
+        while not self._check("RBRACE") and not self._is_at_end():
+            event = self._parse_event()
+            if event:
+                events.append(event)
+
+        self._consume("RBRACE", "Se esperaba '}'")
+
+        if semitones_token:
+            return Transpose(semitones_token.value, events)
+        return None
+
 
 # 3. FUNCIÓN DE UTILIDAD PARA CONVERTIR AST A REPRESENTACIÓN DE TABLA
 
@@ -568,6 +642,9 @@ def ast_to_table_rows(node, parent_id=""):
     elif isinstance(node, Volume):
         rows.append((parent_id, f"Volume {node.level}", ("Volume", "Comando", f"{node.level}"), "leaf"))
 
+    elif isinstance(node, Pan):
+        rows.append((parent_id, f"Pan {node.value}", ("Pan", "Comando", f"{node.value}"), "leaf"))
+
     elif isinstance(node, Instrument):
         rows.append((parent_id, f"Instrument {node.name}", ("Instrument", "Declaración", node.name), "leaf"))
 
@@ -593,6 +670,12 @@ def ast_to_table_rows(node, parent_id=""):
         rows.append((parent_id, repeat_id, ("Repeat", "Control", f"{node.count}x"), "expandable"))
         for event in node.events:
             rows.extend(ast_to_table_rows(event, repeat_id))
+
+    elif isinstance(node, Transpose):
+        transpose_id = f"Transpose {node.semitones}"
+        rows.append((parent_id, transpose_id, ("Transpose", "Control", f"+{node.semitones} semitonos"), "expandable"))
+        for event in node.events:
+            rows.extend(ast_to_table_rows(event, transpose_id))
 
     return rows
 
@@ -634,6 +717,9 @@ def ast_to_tree_string(node, indent="", is_last=True):
     elif isinstance(node, Volume):
         return f"Volume: {node.level}"
 
+    elif isinstance(node, Pan):
+        return f"Pan: {node.value}"
+
     elif isinstance(node, Instrument):
         return f"Instrument: {node.name}"
 
@@ -666,6 +752,16 @@ def ast_to_tree_string(node, indent="", is_last=True):
         for i, event in enumerate(events):
             is_last_event = (i == len(events) - 1)
             extension = "    " if is_last_event else "│   "
+            connector = "└── " if is_last_event else "├── "
+            tree_str = ast_to_tree_string(event, indent + extension, is_last_event)
+            lines.append(indent + connector + tree_str)
+
+    elif isinstance(node, Transpose):
+        lines.append(f"Transpose +{node.semitones}")
+        events = node.events
+        for i, event in enumerate(events):
+            is_last_event = (i == len(events) - 1)
+            extension = "    " if is_last_event else "â”‚   "
             connector = "└── " if is_last_event else "├── "
             tree_str = ast_to_tree_string(event, indent + extension, is_last_event)
             lines.append(indent + connector + tree_str)
@@ -783,12 +879,14 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
         if isinstance(node, Program):    return _v_programa(node)
         if isinstance(node, Tempo):      return _v_tempo(node)
         if isinstance(node, Volume):     return _v_volume(node)
+        if isinstance(node, Pan):        return _v_pan(node)
         if isinstance(node, Instrument): return _v_instrument(node)
         if isinstance(node, Track):      return _v_track(node)
         if isinstance(node, Note):       return _v_note(node)
         if isinstance(node, Rest):       return _v_rest(node)
         if isinstance(node, Chord):      return _v_chord(node)
         if isinstance(node, Repeat):     return _v_repeat(node)
+        if isinstance(node, Transpose):  return _v_transpose(node)
         return None
 
     def _v_programa(node):
@@ -818,6 +916,13 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
         nid = nodo_regla("sentencia\nvolume", "#4527a0")
         arco(nid, nodo_terminal("VOLUME_KW", "volume",       "#6a1b9a"))
         arco(nid, nodo_terminal("NUMBER",    str(node.level), "#37474f"))
+        return nid
+
+    def _v_pan(node):
+        # sentencia/evento â†’ PAN_KW NUMBER
+        nid = nodo_regla("sentencia\npan", "#4527a0")
+        arco(nid, nodo_terminal("PAN_KW", "pan", "#6a1b9a"))
+        arco(nid, nodo_terminal("NUMBER", str(node.value), "#37474f"))
         return nid
 
     def _v_instrument(node):
@@ -878,6 +983,23 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
         arco(nid, nodo_terminal("LBRACE",    "{",             "#455a64"))
 
         # Nodo contenedor del cuerpo del repeat
+        body_nid = nodo_lista(f"cuerpo\n({len(node.events)})")
+        arco(nid, body_nid)
+        for event in node.events:
+            hijo = visitar(event)
+            if hijo:
+                arco(body_nid, hijo)
+
+        arco(nid, nodo_terminal("RBRACE", "}", "#455a64"))
+        return nid
+
+    def _v_transpose(node):
+        # sentencia/evento â†’ TRANSPOSE_KW NUMBER LBRACE cuerpo RBRACE
+        nid = nodo_regla("transpose", "#4e342e")
+        arco(nid, nodo_terminal("TRANSPOSE_KW", "transpose", "#6d4c41"))
+        arco(nid, nodo_terminal("NUMBER", str(node.semitones), "#37474f"))
+        arco(nid, nodo_terminal("LBRACE", "{", "#455a64"))
+
         body_nid = nodo_lista(f"cuerpo\n({len(node.events)})")
         arco(nid, body_nid)
         for event in node.events:

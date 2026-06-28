@@ -162,12 +162,36 @@ class BeatScriptIDE(ctk.CTk):
         frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
 
         # pack: label arriba, status bar abajo, editor en el medio expandido
+        header = ctk.CTkFrame(frame, fg_color="transparent")
+        header.pack(fill="x", padx=12, pady=(8, 2))
+        header.columnconfigure(0, weight=1)
+
         ctk.CTkLabel(
-            frame,
-            text="Editor de código",
+            header,
+            text="Editor de codigo",
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#90caf9",
-        ).pack(anchor="w", padx=12, pady=(8, 2))
+        ).grid(row=0, column=0, sticky="w")
+
+        ctk.CTkButton(
+            header,
+            text="+",
+            width=34,
+            height=26,
+            fg_color="#1565c0",
+            hover_color="#1976d2",
+            command=self._nueva_pestana,
+        ).grid(row=0, column=1, padx=(6, 0))
+
+        ctk.CTkButton(
+            header,
+            text="x",
+            width=34,
+            height=26,
+            fg_color="#37474f",
+            hover_color="#455a64",
+            command=self._cerrar_pestana_actual,
+        ).grid(row=0, column=2, padx=(6, 0))
 
         # Barra de estado (pack al fondo antes del editor) 
         status_bar = ctk.CTkFrame(frame, height=26, corner_radius=0, fg_color="#1a1a2e")
@@ -183,13 +207,31 @@ class BeatScriptIDE(ctk.CTk):
         )
         self.status_label.pack(side="left", padx=4, fill="x", expand=True)
 
-        # ── Contenedor editor: canvas de números │ sep │ textbox 
-        editor_container = tk.Frame(frame, bg=self._EDITOR_BG, bd=0)
-        editor_container.pack(fill="both", expand=True, padx=8, pady=(0, 0))
+        self.editor_tabs = ttk.Notebook(frame)
+        self.editor_tabs.pack(fill="both", expand=True, padx=8, pady=(0, 0))
+        self.editor_tabs.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+        self._tabs = {}
+        self._untitled_count = 0
+        self._nueva_pestana()
 
-        # Canvas para números de línea — dibuja cada número en la posición
-        # exacta en píxeles usando dlineinfo, eliminando cualquier desfase
-        self._line_canvas = tk.Canvas(
+    def _configure_editor_tags(self, inner):
+        inner.tag_configure("hl_keyword",    foreground="#7986cb")
+        inner.tag_configure("hl_note",       foreground="#66bb6a")
+        inner.tag_configure("hl_duration",   foreground="#ffb74d")
+        inner.tag_configure("hl_instrument", foreground="#4dd0e1")
+        inner.tag_configure("hl_number",     foreground="#ff8a65")
+        inner.tag_configure("hl_brace",      foreground="#e0e0e0")
+        inner.tag_configure("hl_comment",    foreground="#546e7a")
+        inner.tag_configure("hl_identifier", foreground="#cfd8dc")
+
+    def _nueva_pestana(self, title=None, content="", path=None):
+        self._untitled_count += 1
+        tab_title = title or f"Sin titulo {self._untitled_count}"
+        tab = tk.Frame(self.editor_tabs, bg=self._EDITOR_BG, bd=0)
+        editor_container = tk.Frame(tab, bg=self._EDITOR_BG, bd=0)
+        editor_container.pack(fill="both", expand=True)
+
+        line_canvas = tk.Canvas(
             editor_container,
             width=38,
             bg=self._EDITOR_BG,
@@ -197,39 +239,38 @@ class BeatScriptIDE(ctk.CTk):
             highlightthickness=0,
             takefocus=False,
         )
-        self._line_canvas.pack(side="left", fill="y")
+        line_canvas.pack(side="left", fill="y")
 
-        # Separador visual
         tk.Frame(editor_container, bg="#2a2a3e", width=1).pack(side="left", fill="y")
 
-        # Editor principal
-        self.editor = ctk.CTkTextbox(
+        editor = ctk.CTkTextbox(
             editor_container,
             font=("Consolas", 13),
             wrap="none",
             activate_scrollbars=True,
             fg_color=self._EDITOR_BG,
         )
-        self.editor.pack(side="left", fill="both", expand=True)
+        editor.pack(side="left", fill="both", expand=True)
+        editor.insert("1.0", content)
 
-        inner = self.editor._textbox
+        inner = editor._textbox
         inner.config(padx=6, pady=4, bd=0, highlightthickness=0)
+        self._configure_editor_tags(inner)
 
-        # Scroll: redibujar números en cada movimiento del scroll
         orig_yscroll = inner.cget("yscrollcommand")
+
         def _yscroll_chain(*args):
             if orig_yscroll:
                 self.tk.call(orig_yscroll, *args)
-            self.after_idle(self._actualizar_lineas)
-        inner.config(yscrollcommand=_yscroll_chain)
+            if self.editor is editor:
+                self.after_idle(self._actualizar_lineas)
 
-        # MouseWheel sobre el canvas también scrollea el editor
-        self._line_canvas.bind(
+        inner.config(yscrollcommand=_yscroll_chain)
+        line_canvas.bind(
             "<MouseWheel>",
             lambda e: inner.yview_scroll(int(-1 * (e.delta / 120)), "units")
         )
 
-        # Eventos 
         inner.bind("<KeyRelease>",    self._actualizar_estado)
         inner.bind("<ButtonRelease>", self._actualizar_estado)
         inner.bind("<KeyRelease>",    self._on_key, add="+")
@@ -239,15 +280,50 @@ class BeatScriptIDE(ctk.CTk):
         inner.bind("<<Redo>>",        lambda e: self.after_idle(self._actualizar_lineas), add="+")
         inner.bind("<ButtonRelease>", lambda e: self.after_idle(self._actualizar_lineas), add="+")
 
-        # Tags de color para resaltado de sintaxis 
-        inner.tag_configure("hl_keyword",    foreground="#7986cb")
-        inner.tag_configure("hl_note",       foreground="#66bb6a")
-        inner.tag_configure("hl_duration",   foreground="#ffb74d")
-        inner.tag_configure("hl_instrument", foreground="#4dd0e1")
-        inner.tag_configure("hl_number",     foreground="#ff8a65")
-        inner.tag_configure("hl_brace",      foreground="#e0e0e0")
-        inner.tag_configure("hl_comment",    foreground="#546e7a")
-        inner.tag_configure("hl_identifier", foreground="#cfd8dc")
+        self.editor_tabs.add(tab, text=tab_title)
+        self._tabs[str(tab)] = {"frame": tab, "editor": editor, "canvas": line_canvas, "path": path}
+        self.editor_tabs.select(tab)
+        self._set_active_tab(tab)
+        self.after(100, self._actualizar_lineas)
+        self.after(100, self._aplicar_resaltado)
+        return tab
+
+    def _set_active_tab(self, tab_id):
+        data = self._tabs.get(str(tab_id))
+        if not data:
+            return
+        self.editor = data["editor"]
+        self._line_canvas = data["canvas"]
+        self.current_file = data.get("path")
+        self._actualizar_estado()
+        self.after_idle(self._actualizar_lineas)
+        self.after_idle(self._aplicar_resaltado)
+
+    def _on_tab_changed(self, event=None):
+        selected = self.editor_tabs.select()
+        if selected:
+            self._set_active_tab(selected)
+
+    def _cerrar_pestana_actual(self):
+        selected = self.editor_tabs.select()
+        if not selected or len(self.editor_tabs.tabs()) <= 1:
+            return
+        self.editor_tabs.forget(selected)
+        self._tabs.pop(str(selected), None)
+        next_tab = self.editor_tabs.select()
+        if next_tab:
+            self._set_active_tab(next_tab)
+
+    def _documentos_abiertos(self):
+        docs = []
+        for tab_id in self.editor_tabs.tabs():
+            data = self._tabs.get(str(tab_id))
+            if not data:
+                continue
+            source = data["editor"].get("1.0", "end-1c").strip()
+            if source:
+                docs.append((tab_id, self.editor_tabs.tab(tab_id, "text"), source))
+        return docs
 
     #  Panel derecho: tabla de tokens (50%) + árbol AST (50%) 
     def _build_right_panels(self, parent):
@@ -463,6 +539,8 @@ class BeatScriptIDE(ctk.CTk):
         "CHORD_KW":      "hl_keyword",
         "REST":          "hl_keyword",
         "VOLUME_KW":     "hl_keyword",
+        "PAN_KW":        "hl_keyword",
+        "TRANSPOSE_KW":  "hl_keyword",
         "NOTE":          "hl_note",
         "DURATION":      "hl_duration",
         "INSTR_NAME":    "hl_instrument",
@@ -609,100 +687,85 @@ class BeatScriptIDE(ctk.CTk):
                 )
 
     def _compilar(self):
-        """
-        Ejecuta el pipeline completo de compilación BeatScript al presionar
-        el botón 'Compilar y Reproducir'.
-
-        Pipeline:
-            1. Etapa 1 — Análisis léxico: tokenize() escanea todo el código y
-               acumula errores léxicos sin detenerse. Siempre produce tokens.
-            2. Validación post-léxica: _validar_tokens_extra() detecta patrones
-               semánticamente inválidos que el lexer acepta (ej: nota con doble
-               octava, instrumento no reconocido, volumen fuera de rango).
-            3. Tabla de tokens: se llena inmediatamente con los tokens producidos.
-            4. Etapa 2 — Análisis sintáctico: BeatScriptParser.parse() verifica
-               la gramática y acumula errores sintácticos con Modo Pánico.
-            5. Consolidación: todos los errores (léxicos + validación + sintácticos)
-               se agrupan en total_errores. Si hay alguno, se muestran todos y
-               se detiene antes de generar el MIDI.
-            6. Generación MIDI + reproducción: solo si total_errores está vacío.
-        """
         self._log("", clear=True)
 
-        source = self.editor.get("1.0", "end-1c").strip()
-        if not source:
-            self._log("El editor está vacío. Escribe código BeatScript primero.")
+        documentos = self._documentos_abiertos()
+        if not documentos:
+            self._log("No hay pestañas con codigo BeatScript para compilar.")
             return
 
-        # ── ETAPA 1: ANÁLISIS LÉXICO ─────────────────────────────────────────
-        self._log("Iniciando análisis léxico...")
-
-        try:
-            from beatscript.lexer import tokenize
-            tokens, errores_lexicos = tokenize(source, collect_errors=True)
-        except ImportError:
-            self._log("beatscript.lexer no encontrado — usando datos de prueba")
-            tokens, errores_lexicos = self._mock_tokens(), []
-        except Exception as e:
-            self._log(f"Error durante el análisis léxico: {e}")
-            return
-
-        self._log(f"  Análisis léxico completado — {len(tokens)} tokens encontrados.")
-
-        # Validación post-léxica: detecta patrones inválidos entre etapas
-        # No detiene el flujo, solo acumula mensajes en avisos_validacion
-        avisos_validacion = self._validar_tokens_extra(tokens, source)
-
-        # Llenar tabla de tokens con los resultados del lexer (siempre)
-        self._llenar_tabla_tokens(tokens, source)
-
-        # ── ETAPA 2: ANÁLISIS SINTÁCTICO ─────────────────────────────────────
-        self._log("Iniciando análisis sintáctico...")
-
-        try:
-            parser = BeatScriptParser(tokens, source)
-            ast = parser.parse()
-            errores_sintacticos = parser.errors
-        except Exception as e:
-            self._log(f"Error durante el análisis sintáctico: {e}")
-            return
-
-        self._log("  Análisis sintáctico completado.")
-
-        # ── CONSOLIDAR TODOS LOS ERRORES ─────────────────────────────────────
-        # Se agrupan en orden: léxicos → validación → sintácticos
+        tokens_por_documento = []
         total_errores = []
+        ast_activo = None
+        tokens_activos = []
+        source_activo = ""
+        selected_tab = self.editor_tabs.select()
+        selected_id = selected_tab
 
-        for err in errores_lexicos:
-            total_errores.append(err["msg"])     # Extraer el string del dict
+        for tab_id, nombre, source in documentos:
+            self._log(f"[{nombre}] Iniciando analisis lexico...")
+            try:
+                from beatscript.lexer import tokenize
+                tokens, errores_lexicos = tokenize(source, collect_errors=True)
+            except ImportError:
+                self._log("beatscript.lexer no encontrado - usando datos de prueba")
+                tokens, errores_lexicos = self._mock_tokens(), []
+            except Exception as e:
+                self._log(f"Error durante el analisis lexico: {e}")
+                return
 
-        for av in avisos_validacion:
-            total_errores.append(av)
+            self._log(f"  Analisis lexico completado - {len(tokens)} tokens encontrados.")
+            avisos_validacion = self._validar_tokens_extra(tokens, source)
 
-        for err in errores_sintacticos:
-            total_errores.append(err)
+            self._log(f"[{nombre}] Iniciando analisis sintactico...")
+            try:
+                parser = BeatScriptParser(tokens, source)
+                ast = parser.parse()
+                errores_sintacticos = parser.errors
+            except Exception as e:
+                self._log(f"Error durante el analisis sintactico: {e}")
+                return
+
+            self._log("  Analisis sintactico completado.")
+
+            for err in errores_lexicos:
+                total_errores.append(f"[{nombre}] {err['msg']}")
+            for av in avisos_validacion:
+                total_errores.append(f"[{nombre}] {av}")
+            for err in errores_sintacticos:
+                total_errores.append(f"[{nombre}] {err}")
+
+            tokens_por_documento.append(tokens)
+            if tab_id == selected_id:
+                ast_activo = ast
+                tokens_activos = tokens
+                source_activo = source
+
+        if not tokens_activos and tokens_por_documento:
+            tokens_activos = tokens_por_documento[0]
+            source_activo = documentos[0][2]
+
+        self._llenar_tabla_tokens(tokens_activos, source_activo)
 
         if total_errores:
             for msg in total_errores:
                 self._log(f"  {msg}")
-            self._log(
-                f"\nCompilación detenida — {len(total_errores)} error(es) en total encontrados."
-            )
+            self._log(f"\nCompilacion detenida - {len(total_errores)} error(es) en total encontrados.")
             return
 
-        # ── SIN ERRORES: mostrar AST y generar MIDI ──────────────────────────
-        self.current_ast = ast
-        self._mostrar_ast(ast)
+        self.current_ast = ast_activo
+        if ast_activo is not None:
+            self._mostrar_ast(ast_activo)
 
         try:
-            from beatscript.midi_gen import tokens_to_midi
+            from beatscript.midi_gen import tokens_to_midi_documents
             midi_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "output.mid"
             )
-            tokens_to_midi(tokens, midi_path)
+            tokens_to_midi_documents(tokens_por_documento, midi_path)
             pygame.mixer.music.load(midi_path)
             pygame.mixer.music.play()
-            self._log(" Reproduciendo output.mid ...")
+            self._log(f" Reproduciendo output.mid con {len(documentos)} pestaña(s)...")
         except Exception as e:
             self._log(f"  No se pudo reproducir el MIDI: {e}")
 
@@ -796,6 +859,24 @@ class BeatScriptIDE(ctk.CTk):
                             f"usa un valor entre 0 y 127"
                         )
 
+            elif tok.type == "PAN_KW":
+                siguiente = tokens[i + 1] if i + 1 < len(tokens) else None
+                if siguiente and siguiente.type != "NUMBER":
+                    col = self._calcular_columna(source, siguiente)
+                    avisos.append(
+                        f"[ERROR LEXICO] Linea {siguiente.lineno}, Col {col}: "
+                        f"'pan' requiere un numero entre 0 y 127, "
+                        f"se encontro '{siguiente.value}'"
+                    )
+                elif siguiente and siguiente.type == "NUMBER":
+                    if not (0 <= siguiente.value <= 127):
+                        col = self._calcular_columna(source, siguiente)
+                        avisos.append(
+                            f"[ERROR LEXICO] Linea {siguiente.lineno}, Col {col}: "
+                            f"pan {siguiente.value} fuera de rango - "
+                            f"usa un valor entre 0 y 127"
+                        )
+
             elif tok.type in ("NOTE", "REST"):
                 siguiente = tokens[i + 1] if i + 1 < len(tokens) else None
                 if siguiente and siguiente.type == "NUMBER":
@@ -848,12 +929,8 @@ class BeatScriptIDE(ctk.CTk):
         try:
             with open(ruta, "r", encoding="utf-8") as f:
                 contenido = f.read()
-            self.editor.delete("1.0", "end")
-            self.editor.insert("1.0", contenido)
-            self._actualizar_estado()
-            self.after(100, self._actualizar_lineas)
-            self.after(100, self._aplicar_resaltado)
-            self.title(f"BeatScript IDE — {os.path.basename(ruta)}")
+            self._nueva_pestana(os.path.basename(ruta), contenido, ruta)
+            self.title(f"BeatScript IDE - {os.path.basename(ruta)}")
             self._log(f"Archivo abierto: {ruta}")
         except Exception as e:
             self._log(f"Error al abrir el archivo: {e}")
@@ -880,7 +957,12 @@ class BeatScriptIDE(ctk.CTk):
             contenido = self.editor.get("1.0", "end-1c")
             with open(ruta, "w", encoding="utf-8") as f:
                 f.write(contenido)
-            self.title(f"BeatScript IDE — {os.path.basename(ruta)}")
+            selected = self.editor_tabs.select()
+            if selected:
+                self.editor_tabs.tab(selected, text=os.path.basename(ruta))
+                if str(selected) in self._tabs:
+                    self._tabs[str(selected)]["path"] = ruta
+            self.title(f"BeatScript IDE - {os.path.basename(ruta)}")
             self._log(f"Archivo guardado: {ruta}")
         except Exception as e:
             self._log(f"Error al guardar el archivo: {e}")

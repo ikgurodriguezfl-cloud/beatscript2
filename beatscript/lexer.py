@@ -51,6 +51,8 @@ RESERVED: dict[str, str] = {
     "chord"       : "CHORD_KW",
     "rest"        : "REST",
     "volume"      : "VOLUME_KW",
+    "pan"         : "PAN_KW",
+    "transpose"   : "TRANSPOSE_KW",
 
     # Duraciones musicales
     "redonda"     : "DURATION",
@@ -119,6 +121,8 @@ tokens = (
     "CHORD_KW",
     "REST",
     "VOLUME_KW",
+    "PAN_KW",
+    "TRANSPOSE_KW",
     "NOTE",
     "DURATION",
     "INSTR_NAME",
