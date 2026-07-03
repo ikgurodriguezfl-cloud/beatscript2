@@ -22,6 +22,8 @@ import customtkinter as ctk
 import pygame
 import os
 from beatscript.parser import BeatScriptParser, ast_to_tree_string, generate_visual_tree
+from beatscript.semantic import SemanticAnalyzer
+
 
 # Apariencia global
 ctk.set_appearance_mode("dark")
@@ -647,15 +649,16 @@ class BeatScriptIDE(ctk.CTk):
         self.ast_textbox.configure(state="normal")
         self.ast_textbox.delete("1.0", "end")
 
-        tree_str = ast_to_tree_string(ast)
+        try:
+            tree_str = ast_to_tree_string(ast)
+        except Exception as e:
+            tree_str = f"[No se pudo generar la vista del AST: {e}]"
+            self._log(f"  Advertencia: fallo al renderizar el AST — {e}")
+
         self.ast_textbox.insert("1.0", tree_str)
         self.ast_textbox.configure(state="disabled")
-
-        # Actualizar etiqueta con conteo aproximado de nodos
         num_nodes = tree_str.count("\n") + 1
-        self.ast_label.configure(
-            text=f"Árbol Sintáctico — Parser (Etapa 2 — {num_nodes} nodos)"
-        )
+        self.ast_label.configure(text=f"Árbol Sintáctico — Parser (Etapa 2 — {num_nodes} nodos)")
 
     #  Abrir árbol de derivación visual (Graphviz → PNG) 
     def _abrir_arbol_visual(self):
@@ -734,11 +737,34 @@ class BeatScriptIDE(ctk.CTk):
 
             self._log("  Analisis sintactico completado.")
 
+            # ── ETAPA 3: ANÁLISIS SEMÁNTICO ──────────────────────────────────
+            self._log(f"[{nombre}] Iniciando analisis semantico...")
+            try:
+                analyzer = SemanticAnalyzer(ast)
+                errores_semanticos, advertencias_semanticas = analyzer.analyze()
+            except Exception as e:
+                self._log(f"  Error durante el analisis semantico: {e}")
+                total_errores.append(f"[{nombre}] Fallo interno del analizador semántico: {e}")
+                errores_semanticos, advertencias_semanticas = [], []
+            else:
+                self._log(
+                    f"  Analisis semantico completado — "
+                    f"{len(errores_semanticos)} error(es), "
+                    f"{len(advertencias_semanticas)} advertencia(s)."
+                )
+
+            # Advertencias: se muestran pero NO detienen la compilación
+            for adv in advertencias_semanticas:
+                self._log(f"  [{nombre}] {adv}")
+
             for err in errores_lexicos:
                 total_errores.append(f"[{nombre}] {err['msg']}")
             for av in avisos_validacion:
                 total_errores.append(f"[{nombre}] {av}")
             for err in errores_sintacticos:
+                total_errores.append(f"[{nombre}] {err}")
+            # Errores semánticos sí detienen la compilación
+            for err in errores_semanticos:
                 total_errores.append(f"[{nombre}] {err}")
 
             tokens_por_documento.append(tokens)

@@ -58,8 +58,10 @@ def _get_suggestions_for_word(word, keywords_dict=None, cutoff=0.6, max_suggesti
 
 class ASTNode:
     """Clase base para todos los nodos del árbol sintáctico."""
+    lineno = None   # se asigna al construir el nodo, ver _with_line() abajo
     def __repr__(self):
         return f"<{self.__class__.__name__}>"
+    
 
 
 class Program(ASTNode):
@@ -206,6 +208,11 @@ class Sequence(ASTNode):
 
 class BeatScriptParser:
     """Parser que convierte tokens en un árbol sintáctico (AST)."""
+    def _with_line(self, node, token):
+        """Adjunta el número de línea de `token` al nodo AST recién creado."""
+        if node is not None and token is not None:
+            node.lineno = token.lineno
+        return node
 
     def __init__(self, tokens, source_code=""):
         """
@@ -420,51 +427,57 @@ class BeatScriptParser:
 
     def _parse_tempo(self):
         """Parsea: tempo <número>"""
+        kw = self._current_token()
         self._consume("TEMPO_KW")
         num_token = self._consume("NUMBER", "Se esperaba un número después de 'tempo'")
 
         if num_token:
-            return Tempo(num_token.value)
+            return self._with_line(Tempo(num_token.value), kw)
         return None
 
     def _parse_volume(self):
         """Parsea: volume <número>"""
+        kw = self._current_token()
         self._consume("VOLUME_KW")
         num_token = self._consume("NUMBER", "Se esperaba un número después de 'volume'")
 
         if num_token:
-            return Volume(num_token.value)
+            return self._with_line(Volume(num_token.value), kw)
         return None
 
     def _parse_compas(self):
         """Parsea: compas <numerador> <denominador>"""
+        kw = self._current_token()
         self._consume("COMPAS_KW")
         numerator = self._consume("NUMBER", "Se esperaba el numerador despues de 'compas'")
         denominator = self._consume("NUMBER", "Se esperaba el denominador despues del numerador")
 
         if numerator and denominator:
-            return Compas(numerator.value, denominator.value)
+            return self._with_line(Compas(numerator.value, denominator.value), kw)
         return None
 
     def _parse_pan(self):
         """Parsea: pan <numero>"""
+        kw = self._current_token()
         self._consume("PAN_KW")
         num_token = self._consume("NUMBER", "Se esperaba un numero despues de 'pan'")
 
         if num_token:
-            return Pan(num_token.value)
+            return self._with_line(Pan(num_token.value), kw)
         return None
 
     def _parse_instrument(self):
         """Parsea: instrument <nombre_instrumento>"""
+        kw = self._current_token()
         self._consume("INSTRUMENT_KW")
         instr_token = self._consume("INSTR_NAME", "Se esperaba un nombre de instrumento")
 
         if instr_token:
-            return Instrument(instr_token.value)
+            return self._with_line(Instrument(instr_token.value), kw)
         return None
     def _parse_track(self):
         """Parsea: track <identificador> { <eventos> }"""
+        kw = self._current_token()
         self._consume("TRACK_KW")
         name_token = self._consume("IDENTIFIER", "Se esperaba un nombre de track")
         self._consume("LBRACE", "Se esperaba '{'")
@@ -478,18 +491,19 @@ class BeatScriptParser:
         self._consume("RBRACE", "Se esperaba '}'")
 
         if name_token:
-            return Track(name_token.value, events)
+            return self._with_line(Track(name_token.value, events), kw)
         return None
 
     def _parse_sequence(self):
         """Parsea: secuencia { (track1, track2), track3 }"""
+        kw = self._current_token()
         self._consume("SEQUENCE_KW")
         self._consume("LBRACE", "Se esperaba '{' despues de 'secuencia'")
 
         groups = []
         while not self._check("RBRACE") and not self._is_at_end():
             group = self._parse_sequence_group()
-            if group:
+            if group and group[0]:
                 groups.append(group)
             if self._check("COMMA"):
                 self._consume("COMMA")
@@ -500,9 +514,10 @@ class BeatScriptParser:
                     self._synchronize({"COMMA", "RBRACE"})
 
         self._consume("RBRACE", "Se esperaba '}'")
-        return Sequence(groups)
+        return self._with_line(Sequence(groups), kw)
 
     def _parse_sequence_group(self):
+        start_token = self._current_token()
         if self._check("LPAREN"):
             self._consume("LPAREN")
             names = []
@@ -518,10 +533,12 @@ class BeatScriptParser:
                         self._add_error("Se esperaba ',' o ')' dentro del grupo paralelo", token=current)
                         self._synchronize({"COMMA", "RPAREN"})
             self._consume("RPAREN", "Se esperaba ')'")
-            return names
+            return (names, True, start_token.lineno if start_token else None)
 
         name_token = self._consume("IDENTIFIER", "Se esperaba nombre de track en secuencia")
-        return [name_token.value] if name_token else []
+        if name_token:
+            return ([name_token.value], False, name_token.lineno)
+        return ([], False, start_token.lineno if start_token else None)
 
     def _parse_chord(self):
         """
@@ -558,11 +575,13 @@ class BeatScriptParser:
             return None
 
         if duration_token:
-            return Chord(notas, duration_token.value)
+            return self._with_line(Chord(notas, duration_token.value), kw_token)
         return None
 
     def _parse_repeat_statement(self):
         """Parsea repeat a nivel de sentencia: repeat <número> { <sentencias> }"""
+        
+        kw = self._current_token()
         self._consume("REPEAT_KW")
         count_token = self._consume("NUMBER", "Se esperaba un número después de 'repeat'")
         self._consume("LBRACE", "Se esperaba '{'")
@@ -576,11 +595,12 @@ class BeatScriptParser:
         self._consume("RBRACE", "Se esperaba '}'")
 
         if count_token:
-            return Repeat(count_token.value, statements)
+            return self._with_line(Repeat(count_token.value, statements), kw)
         return None
 
     def _parse_transpose_statement(self):
         """Parsea transpose a nivel de sentencia: transpose <numero> { <sentencias> }"""
+        kw = self._current_token()
         self._consume("TRANSPOSE_KW")
         semitones_token = self._consume("NUMBER", "Se esperaba un numero despues de 'transpose'")
         self._consume("LBRACE", "Se esperaba '{'")
@@ -594,11 +614,12 @@ class BeatScriptParser:
         self._consume("RBRACE", "Se esperaba '}'")
 
         if semitones_token:
-            return Transpose(semitones_token.value, statements)
+            return self._with_line(Transpose(semitones_token.value, statements), kw)
         return None
 
     def _parse_accent_statement(self):
         """Parsea acento a nivel de sentencia: acento [numero] { <sentencias> }"""
+        kw = self._current_token()
         self._consume("ACCENT_KW")
         velocity_token = None
         if self._check("NUMBER"):
@@ -612,7 +633,7 @@ class BeatScriptParser:
                 statements.append(stmt)
 
         self._consume("RBRACE", "Se esperaba '}'")
-        return Accent(velocity_token.value if velocity_token else None, statements)
+        return self._with_line(Accent(velocity_token.value if velocity_token else None, statements), kw)
 
     # EVENTOS (dentro de tracks)
 
@@ -677,40 +698,38 @@ class BeatScriptParser:
         )
 
         if note_token and duration_token:
-            return Note(note_token.value, duration_token.value)
+            return self._with_line(Note(note_token.value, duration_token.value), note_token)
         return None
 
     def _parse_rest(self):
         """Parsea: rest <duración>"""
-        self._consume("REST")
+        rest_token = self._consume("REST")
         duration_token = self._consume(
             "DURATION", "Se esperaba una duración después de 'rest'"
         )
 
         if duration_token:
-            return Rest(duration_token.value)
+            return self._with_line(Rest(duration_token.value), rest_token)
         return None
 
     def _parse_repeat_event(self):
-        """Parsea repeat a nivel de evento: repeat <número> { <eventos> }"""
+        kw = self._current_token()
         self._consume("REPEAT_KW")
         count_token = self._consume("NUMBER", "Se esperaba un número después de 'repeat'")
         self._consume("LBRACE", "Se esperaba '{'")
-
         events = []
         while not self._check("RBRACE") and not self._is_at_end():
             event = self._parse_event()
             if event:
                 events.append(event)
-
         self._consume("RBRACE", "Se esperaba '}'")
-
         if count_token:
-            return Repeat(count_token.value, events)
+            return self._with_line(Repeat(count_token.value, events), kw)
         return None
 
     def _parse_transpose_event(self):
         """Parsea transpose a nivel de evento: transpose <numero> { <eventos> }"""
+        kw = self._current_token()
         self._consume("TRANSPOSE_KW")
         semitones_token = self._consume("NUMBER", "Se esperaba un numero despues de 'transpose'")
         self._consume("LBRACE", "Se esperaba '{'")
@@ -724,11 +743,12 @@ class BeatScriptParser:
         self._consume("RBRACE", "Se esperaba '}'")
 
         if semitones_token:
-            return Transpose(semitones_token.value, events)
+            return self._with_line(Transpose(semitones_token.value, events), kw)
         return None
 
     def _parse_accent_event(self):
         """Parsea acento a nivel de evento: acento [numero] { <eventos> }"""
+        kw = self._current_token()
         self._consume("ACCENT_KW")
         velocity_token = None
         if self._check("NUMBER"):
@@ -742,7 +762,7 @@ class BeatScriptParser:
                 events.append(event)
 
         self._consume("RBRACE", "Se esperaba '}'")
-        return Accent(velocity_token.value if velocity_token else None, events)
+        return self._with_line(Accent(velocity_token.value if velocity_token else None, events), kw)
 
 
 # 3. FUNCIÓN DE UTILIDAD PARA CONVERTIR AST A REPRESENTACIÓN DE TABLA
@@ -792,8 +812,9 @@ def ast_to_table_rows(node, parent_id=""):
     elif isinstance(node, Sequence):
         sequence_id = "Sequence"
         rows.append((parent_id, sequence_id, ("Secuencia", "Control", f"{len(node.groups)} pasos"), "expandable"))
-        for i, group in enumerate(node.groups, 1):
-            rows.append((sequence_id, f"Sequence {i}", ("Paso", "Paralelo" if len(group) > 1 else "Track", " + ".join(group)), "leaf"))
+        for i, (names, is_parallel, _lineno) in enumerate(node.groups, 1):
+            rows.append((sequence_id, f"Sequence {i}",
+                        ("Paso", "Paralelo" if is_parallel else "Track", " + ".join(names)), "leaf"))
 
     elif isinstance(node, Rest):
         rows.append((parent_id, f"Rest {node.duration}", ("Silencio", "Evento", node.duration), "leaf"))
@@ -883,10 +904,10 @@ def ast_to_tree_string(node, indent="", is_last=True):
 
     elif isinstance(node, Sequence):
         lines.append("Secuencia")
-        for i, group in enumerate(node.groups):
+        for i, (names, is_parallel, _lineno) in enumerate(node.groups, 1):
             is_last_group = (i == len(node.groups) - 1)
             connector = "└── " if is_last_group else "├── "
-            label = " + ".join(group) if len(group) > 1 else group[0]
+            label = " + ".join(names) if is_parallel else names[0]
             lines.append(indent + connector + f"Paso {i + 1}: {label}")
 
     elif isinstance(node, Note):
@@ -1133,8 +1154,8 @@ def generate_visual_tree(ast_root, output_filename="parse_tree"):
         arco(nid, nodo_terminal("LBRACE", "{", "#455a64"))
         body_nid = nodo_lista(f"pasos\n({len(node.groups)})")
         arco(nid, body_nid)
-        for i, group in enumerate(node.groups, 1):
-            label = " + ".join(group) if len(group) > 1 else group[0]
+        for i, (names, is_parallel, _lineno) in enumerate(node.groups, 1):
+            label = " + ".join(names) if is_parallel else names[0]
             step_nid = nodo_regla(f"paso {i}\n{label}", "#37474f")
             arco(body_nid, step_nid)
         arco(nid, nodo_terminal("RBRACE", "}", "#455a64"))
