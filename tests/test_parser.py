@@ -414,12 +414,20 @@ class TestErroresEstructurales(BeatScriptParserTestCase):
             msg="chord sin '{' debería generar error sintáctico.")
 
     def test_chord_vacio_sin_notas(self):
-        """chord con solo duración (sin notas) genera error."""
+        """chord con solo duración (sin notas) se valida como error semántico."""
         source = "track t { chord { blanca } }\n"
         ast, errors, _ = self._parse(source)
 
-        self.assertGreater(len(errors), 0,
-            msg="chord sin notas debería generar al menos 1 error.")
+        self.assertEqual(len(errors), 0,
+            msg="chord vacío no debería detener el parser con error sintáctico.")
+
+        from beatscript.semantic import SemanticAnalyzer
+        analyzer = SemanticAnalyzer(ast)
+        sem_errors, warnings = analyzer.analyze()
+
+        combined = " ".join(sem_errors + warnings).lower()
+        self.assertIn("14", combined,
+            msg="chord vacío debería generar el error semántico 14.")
 
     def test_repeat_sin_numero(self):
         """repeat sin número de repeticiones genera error sintáctico."""

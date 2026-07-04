@@ -32,6 +32,22 @@ def _calc_events_duration(events: list) -> float:
         # Volume, Pan, Instrument no avanzan el tiempo
     return total
 
+
+def _events_produce_sound(events: list) -> bool:
+    """True si alguna construcción anidada genera notas audibles."""
+    for event in events:
+        if isinstance(event, Note):
+            return True
+        if isinstance(event, Chord) and len(event.notes) > 0:
+            return True
+        if isinstance(event, Repeat):
+            if event.count > 0 and _events_produce_sound(event.events):
+                return True
+        elif isinstance(event, (Transpose, Accent, Track)):
+            if _events_produce_sound(event.events):
+                return True
+    return False
+
 class SemanticAnalyzer:
     def __init__(self, ast: Program):
         self.ast = ast
@@ -55,11 +71,26 @@ class SemanticAnalyzer:
         return self.errors, self.warnings
     
     def _statement_plays_something(self, stmt) -> bool:
-        """True si stmt ES o CONTIENE (anidado) un Track o Sequence."""
-        if isinstance(stmt, (Track, Sequence)):
-            return True
+        """True si stmt produce salida audible real."""
+        if isinstance(stmt, Track):
+            info = self._symbols["tracks"].get(stmt.name)
+            return bool(info and info.get("has_sound"))
+        if isinstance(stmt, Sequence):
+            return self._sequence_has_sound(stmt)
         if isinstance(stmt, (Repeat, Transpose, Accent)):
             return any(self._statement_plays_something(s) for s in stmt.events)
+        if isinstance(stmt, Note):
+            return True
+        if isinstance(stmt, Chord):
+            return len(stmt.notes) > 0
+        return False
+
+    def _sequence_has_sound(self, node: Sequence) -> bool:
+        for names, _is_parallel, _lineno in node.groups:
+            for name in names:
+                info = self._symbols["tracks"].get(name)
+                if info and info.get("has_sound"):
+                    return True
         return False
 
     # ── Reporte ──────────────────────────────────────────
@@ -96,13 +127,15 @@ class SemanticAnalyzer:
                             f"nombres de track deben ser únicos.", node)
             return
         empty = len(node.events) == 0
+        has_sound = _events_produce_sound(node.events)
         self._symbols["tracks"][node.name] = {
             "node": node, "empty": empty, "referenced": False,
+            "has_sound": has_sound,
             "duration": _calc_events_duration(node.events) * multiplier,
         }
         if empty:
             self._warning(15, f"Track '{node.name}' está vacío y no producirá ninguna nota.", node)
-        else:
+        elif has_sound:
             self._symbols["has_audible_output"] = True
 
     # ── Pass 2: validación en orden de ejecución ─────────
@@ -186,6 +219,8 @@ class SemanticAnalyzer:
         track_context = dict(context)
         for event in node.events:
             self._visit(event, track_context)
+        if _events_produce_sound(node.events):
+            self._symbols["has_audible_output"] = True
 
     def _check_pitch(self, pitch: str, context: dict, node=None):
         try:
@@ -233,6 +268,8 @@ class SemanticAnalyzer:
         if node.count == 0:
             self._warning(6, "repeat 0 — el bloque nunca se ejecutará; es código muerto.", node)
             return
+        if node.count == 1:
+            self._warning(27, "repeat 1 no cambia el resultado; es equivalente a omitir el bloque repeat.", node)
         for event in node.events:
             self._visit(event, context)
 
@@ -269,8 +306,8 @@ class SemanticAnalyzer:
             self._warning(23, "secuencia { } está vacía y no producirá ninguna salida.", node)
             return
 
-        self._symbols["sequence_exists"] = True
         declared = self._symbols["tracks"]
+        sequence_has_sound = False
 
         for i, (names, is_parallel, _lineno) in enumerate(node.groups, 1):
             if is_parallel and len(names) == 1:
@@ -286,6 +323,8 @@ class SemanticAnalyzer:
                         f"track '{name}' referenciado en secuencia pero "
                         f"nunca fue declarado.", node)
                     continue
+                if declared[name].get("has_sound"):
+                    sequence_has_sound = True
                 if name in seen:
                     self._warning(24,
                         f"track '{name}' aparece más de una vez en el mismo "
@@ -296,10 +335,12 @@ class SemanticAnalyzer:
                     self._symbols["sequence_refs"].add(name)
 
         self._symbols["sequence_total_duration"] = sum(
-            max((declared[n]["duration"] for n in names if n in declared), default=0.0)
+            max((declared[n]["duration"] for n in names if n in declared and declared[n].get("has_sound")), default=0.0)
             for names, _, _ in node.groups
         )
-        self._symbols["has_audible_output"] = True
+        self._symbols["sequence_exists"] = True
+        if sequence_has_sound:
+            self._symbols["has_audible_output"] = True
 
     # ── Invariantes globales ──────────────────────────────
 
@@ -311,7 +352,7 @@ class SemanticAnalyzer:
 
         if self._symbols["sequence_exists"]:
             for name, info in self._symbols["tracks"].items():
-                if not info["referenced"] and not info["empty"]:
+                if info.get("has_sound") and not info["referenced"]:
                     self._warning(22,
                         f"track '{name}' está declarado pero nunca es "
                         f"referenciado en secuencia; no producirá salida.", info["node"])
@@ -319,7 +360,7 @@ class SemanticAnalyzer:
             seq_duration = self._symbols["sequence_total_duration"]
             if seq_duration > 0:
                 for name, info in self._symbols["tracks"].items():
-                    if name in self._symbols["sequence_refs"] or info["empty"]:
+                    if name in self._symbols["sequence_refs"] or not info.get("has_sound"):
                         continue
                     if info["duration"] > seq_duration * 2:
                         self._warning(25,

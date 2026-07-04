@@ -567,13 +567,6 @@ class BeatScriptParser:
         )
         self._consume("RBRACE", "Se esperaba '}'")
 
-        if not notas and kw_token:
-            self._add_error(
-                "El acorde debe contener al menos una nota antes de la duración.",
-                token=kw_token,
-            )
-            return None
-
         if duration_token:
             return self._with_line(Chord(notas, duration_token.value), kw_token)
         return None
