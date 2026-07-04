@@ -21,6 +21,7 @@ from tkinter import ttk, filedialog
 import customtkinter as ctk
 import pygame
 import os
+import re
 from beatscript.parser import BeatScriptParser, ast_to_tree_string, generate_visual_tree
 from beatscript.semantic import SemanticAnalyzer
 
@@ -62,6 +63,7 @@ class BeatScriptIDE(ctk.CTk):
 
         # AST del último compilado exitoso; None hasta que se compile correctamente
         self.current_ast = None
+        self._tab_spaces = 2
 
         self._build_toolbar()
         self._build_main_area()
@@ -256,8 +258,9 @@ class BeatScriptIDE(ctk.CTk):
         editor.insert("1.0", content)
 
         inner = editor._textbox
-        inner.config(padx=6, pady=4, bd=0, highlightthickness=0)
+        inner.config(padx=6, pady=4, bd=0, highlightthickness=0, undo=True, autoseparators=True, maxundo=-1)
         self._configure_editor_tags(inner)
+        self._bind_editor_shortcuts(inner)
 
         orig_yscroll = inner.cget("yscrollcommand")
 
@@ -289,6 +292,77 @@ class BeatScriptIDE(ctk.CTk):
         self.after(100, self._actualizar_lineas)
         self.after(100, self._aplicar_resaltado)
         return tab
+
+    def _bind_editor_shortcuts(self, inner):
+        inner.bind("<Control-z>", self._on_undo, add="+")
+        inner.bind("<Control-y>", self._on_redo, add="+")
+        inner.bind("<Control-Z>", self._on_undo, add="+")
+        inner.bind("<Control-Y>", self._on_redo, add="+")
+        inner.bind("<Control-BackSpace>", self._on_ctrl_backspace, add="+")
+        inner.bind("<Control-Delete>", self._on_ctrl_delete, add="+")
+        inner.bind("<Tab>", self._on_tab, add="+")
+
+    def _on_undo(self, event=None):
+        try:
+            self.editor._textbox.edit_undo()
+            self.after_idle(self._actualizar_lineas)
+            self.after_idle(self._actualizar_estado)
+        except tk.TclError:
+            pass
+        return "break"
+
+    def _on_redo(self, event=None):
+        try:
+            self.editor._textbox.edit_redo()
+            self.after_idle(self._actualizar_lineas)
+            self.after_idle(self._actualizar_estado)
+        except tk.TclError:
+            pass
+        return "break"
+
+    def _on_tab(self, event=None):
+        widget = event.widget if event and getattr(event, "widget", None) else self.editor._textbox
+        indent = " " * self._tab_spaces
+        widget.insert("insert", indent)
+        self.after_idle(self._actualizar_lineas)
+        self.after_idle(self._actualizar_estado)
+        return "break"
+
+    def _delete_word_at_cursor(self, widget, direction="forward"):
+        insert_index = widget.index("insert")
+        line_end = widget.index(f"{insert_index} lineend")
+        tail = widget.get(insert_index, line_end)
+
+        if direction == "forward":
+            match = re.search(r"\S+", tail)
+            if not match:
+                return False
+            start = widget.index(f"{insert_index}+{match.start()}c")
+            end = widget.index(f"{insert_index}+{match.end()}c")
+        else:
+            head = widget.get(f"{insert_index} linestart", insert_index)
+            match = re.search(r"\S+\s*$", head)
+            if not match:
+                return False
+            start = widget.index(f"{insert_index}-{len(head) - match.start()}c")
+            end = insert_index
+
+        widget.delete(start, end)
+        return True
+
+    def _on_ctrl_delete(self, event=None):
+        widget = event.widget if event and getattr(event, "widget", None) else self.editor._textbox
+        if self._delete_word_at_cursor(widget, direction="forward"):
+            self.after_idle(self._actualizar_lineas)
+            self.after_idle(self._actualizar_estado)
+        return "break"
+
+    def _on_ctrl_backspace(self, event=None):
+        widget = event.widget if event and getattr(event, "widget", None) else self.editor._textbox
+        if self._delete_word_at_cursor(widget, direction="backward"):
+            self.after_idle(self._actualizar_lineas)
+            self.after_idle(self._actualizar_estado)
+        return "break"
 
     def _set_active_tab(self, tab_id):
         data = self._tabs.get(str(tab_id))
@@ -1252,23 +1326,24 @@ tempo 110
 volume 80
 
 instrument violin
-
+    
 track melodia {
-    E4 negra
-    E4 negra
-    F4 negra
-    G4 negra
-    G4 negra
-    F4 negra
-    E4 negra
-    D4 negra
-    C4 negra
-    C4 negra
-    D4 negra
-    E4 negra
-    E4 blanca
-    D4 blanca
+  E4 negra
+  E4 negra
+  F4 negra
+  G4 negra
+  G4 negra
+  F4 negra
+  E4 negra
+  D4 negra
+  C4 negra
+  C4 negra
+  D4 negra
+  E4 negra
+  E4 blanca
+  D4 blanca
 }
+
 """
         self.editor.delete("1.0", "end")
         self.editor.insert("1.0", ejemplo)
