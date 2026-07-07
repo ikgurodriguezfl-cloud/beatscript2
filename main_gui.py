@@ -949,64 +949,13 @@ class BeatScriptIDE(ctk.CTk):
 
             elif tok.type == "VOLUME_KW":
                 siguiente = tokens[i + 1] if i + 1 < len(tokens) else None
-                if siguiente and siguiente.type != "NUMBER":
-                    col = self._calcular_columna(source, siguiente)
-                    avisos.append(
-                        f"[ERROR LÉXICO] Línea {siguiente.lineno}, Col {col}: "
-                        f"'volume' requiere un número entre 0 y 127, "
-                        f"se encontró '{siguiente.value}'"
-                    )
-                elif siguiente and siguiente.type == "NUMBER":
-                    if not (0 <= siguiente.value <= 127):
-                        col = self._calcular_columna(source, siguiente)
-                        avisos.append(
-                            f"[ERROR LÉXICO] Línea {siguiente.lineno}, Col {col}: "
-                            f"volumen {siguiente.value} fuera de rango — "
-                            f"usa un valor entre 0 y 127"
-                        )
 
             elif tok.type == "PAN_KW":
                 siguiente = tokens[i + 1] if i + 1 < len(tokens) else None
-                if siguiente and siguiente.type != "NUMBER":
-                    col = self._calcular_columna(source, siguiente)
-                    avisos.append(
-                        f"[ERROR LEXICO] Linea {siguiente.lineno}, Col {col}: "
-                        f"'pan' requiere un numero entre 0 y 127, "
-                        f"se encontro '{siguiente.value}'"
-                    )
-                elif siguiente and siguiente.type == "NUMBER":
-                    if not (0 <= siguiente.value <= 127):
-                        col = self._calcular_columna(source, siguiente)
-                        avisos.append(
-                            f"[ERROR LEXICO] Linea {siguiente.lineno}, Col {col}: "
-                            f"pan {siguiente.value} fuera de rango - "
-                            f"usa un valor entre 0 y 127"
-                        )
-
-            elif tok.type == "COMPAS_KW":
-                numerador = tokens[i + 1] if i + 1 < len(tokens) else None
-                denominador = tokens[i + 2] if i + 2 < len(tokens) else None
-                if numerador and numerador.type == "NUMBER" and denominador and denominador.type == "NUMBER":
-                    if numerador.value <= 0 or denominador.value <= 0:
-                        col = self._calcular_columna(source, tok)
-                        avisos.append(
-                            f"[ERROR LEXICO] Linea {tok.lineno}, Col {col}: "
-                            "compas requiere valores mayores a 0, ej: compas 4 4"
-                        )
-
-            elif tok.type == "ACCENT_KW":
-                siguiente = tokens[i + 1] if i + 1 < len(tokens) else None
-                if siguiente and siguiente.type == "NUMBER" and not (0 <= siguiente.value <= 127):
-                    col = self._calcular_columna(source, siguiente)
-                    avisos.append(
-                        f"[ERROR LEXICO] Linea {siguiente.lineno}, Col {col}: "
-                        f"acento {siguiente.value} fuera de rango - usa un valor entre 0 y 127"
-                    )
 
             elif tok.type in ("NOTE", "REST"):
                 siguiente = tokens[i + 1] if i + 1 < len(tokens) else None
                 if siguiente and siguiente.type == "NUMBER":
-                    # Caso E44, E44444, etc. — el lexer parte NOTE(E4) + NUMBER(4...)
                     col = self._calcular_columna(source, tok)
                     avisos.append(
                         f"[ERROR LÉXICO] Línea {tok.lineno}, Col {col}: "
