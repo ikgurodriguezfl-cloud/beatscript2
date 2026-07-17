@@ -9,6 +9,12 @@ Integrantes del Equipo:
 Nombre del proyecto:
 # BeatScript
 
+**Tu código, tu sinfonía**
+
+![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)
+![Status](https://img.shields.io/badge/estado-en%20desarrollo-yellow)
+![License](https://img.shields.io/badge/licencia-MIT-green)
+
 BeatScript es un compilador para un lenguaje de dominio específico (DSL) pensado para componer música:
 traduce código fuente legible por humanos directamente a un archivo .mid reproducible, 
 sin pasar por ningún DAW ni notación musical tradicional.
@@ -73,14 +79,25 @@ secuencia {
 
 ## Arquitectura del compilador
 
-| Etapa                 | Módulo         | Entrada / Salida                 | Estado |
-| 1. Léxico             | `lexer.py`     | código fuente a tokens           | Completado |
-| 2. Sintáctico         | `parser.py`    | tokens a AST                     | Completado |
-| 3. Semántico          | `semantic.py`  | AST a errores / advertencias     | Completado |
-| 4. Código intermedio  | pendiente      | AST a representación intermedia  | Pendiente |
-| 5. Optimización       | pendiente      | código intermedio optimizado     | Pendiente |
-| 6. Código objeto      |  pendiente     | código intermedio a salida final | Pendiente |
+```mermaid
+flowchart LR
+    A[Codigo BeatScript] --> B[Lexer]
+    B --> C[Parser]
+    C --> D[Analizador Semantico]
+    D --> E[Codigo Intermedio]
+    E --> F[Optimizacion]
+    F --> G[Codigo Objeto]
+    G --> H[(archivo .mid)]
+```
 
+| Etapa | Módulo | Entrada / Salida | Estado |
+|---|---|---|---|
+| 1. Léxico | `lexer.py` | código fuente a tokens | Completado |
+| 2. Sintáctico | `parser.py` | tokens a AST | Completado |
+| 3. Semántico | `semantic.py` | AST a errores / advertencias | Completado |
+| 4. Código intermedio | — | AST a representación intermedia | Pendiente |
+| 5. Optimización | — | código intermedio optimizado | Pendiente |
+| 6. Código objeto | — | código intermedio a salida final | Pendiente |
 ## Instalación
 
 Requiere Python 3.9 o superior.
@@ -103,20 +120,21 @@ y si el código no tiene errores se genera `output.mid` y se reproduce automáti
 
 ## Referencia del lenguaje
 
-| Instrucción                   | Descripción |
-| `tempo N`                     | Velocidad en BPM (20-300) |
-| `volume N`                    | Volumen / velocity MIDI (0-127); global o dentro de un track |
-| `pan N`                       | Paneo estéreo (0 = izquierda, 127 = derecha) |
-| `compas N M`                  | Métrica del compás (M debe ser potencia de 2) |
-| `instrument NOMBRE`           | Instrumento General MIDI (`piano`, `violin`, `guitar`, `trumpet`, `drums`, etc.) |
-| `track NOMBRE { }`            | Declara una pista con nombre |
-| `NOTA DURACION`               | Nota musical, ej. `C4 negra`, `D#3 corchea`, `Eb5 blanca` |
-| `rest DURACION`               | Silencio |
-| `chord { NOTA+ DURACION }`    | Acorde: varias notas simultáneas |
-| `repeat N { }`                | Repite el bloque N veces |
-| `transpose N { }`             | Transpone N semitonos (solo dentro del bloque) |
-| `acento [N] { }`              | Sube el volumen del bloque (valor explícito o +20 automático) |
-| `secuencia { (a,b), c }`      | Grupos entre paréntesis suenan en paralelo; separados por coma, en secuencia |
+| Instrucción | Descripción |
+| `tempo N` | Velocidad en BPM (20-300) |
+| `volume N` | Volumen / velocity MIDI (0-127); global o dentro de un track |
+| `pan N` | Paneo estéreo (0 = izquierda, 127 = derecha) |
+| `compas N M` | Métrica del compás (M debe ser potencia de 2) |
+| `instrument NOMBRE` | Instrumento General MIDI (`piano`, `violin`, `guitar`, `trumpet`, `drums`, etc.) |
+| `track NOMBRE { }` | Declara una pista con nombre |
+| `NOTA DURACION` | Nota musical, ej. `C4 negra`, `D#3 corchea`, `Eb5 blanca` |
+| `rest DURACION` | Silencio |
+| `chord { NOTA+ DURACION }` | Acorde: varias notas simultáneas |
+| `repeat N { }` | Repite el bloque N veces |
+| `transpose N { }` | Transpone N semitonos (solo dentro del bloque) |
+| `acento [N] { }` | Sube el volumen del bloque (valor explícito o +20 automático) |
+| `secuencia { (a,b), c }` | Grupos entre paréntesis suenan en paralelo; separados por coma, en secuencia |
+
 
 Duraciones válidas: `redonda`, `blanca`, `negra`, `corchea`, `semicorchea`, `fusa`, `semifusa`, 
 y su variante con puntillo agregando `_punto` (ej. `negra_punto`).
