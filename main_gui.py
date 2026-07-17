@@ -64,6 +64,8 @@ class BeatScriptIDE(ctk.CTk):
 
         # AST del último compilado exitoso; None hasta que se compile correctamente
         self.current_ast = None
+        self.tac_routines = []
+        self.tac_schedule = {}
         self._tab_spaces = 2
 
         self._build_toolbar()
@@ -131,6 +133,16 @@ class BeatScriptIDE(ctk.CTk):
             font=ctk.CTkFont(size=13),
             width=185,
             command=self._mostrar_documentacion_errores,
+        ).pack(side="left", padx=(0, 10), pady=10)
+
+        ctk.CTkButton(
+            toolbar,
+            text="Cuadruplos y Tripletas",
+            fg_color="#5d4037",
+            hover_color="#6d4c41",
+            font=ctk.CTkFont(size=13),
+            width=200,
+            command=self._mostrar_tac_visual,
         ).pack(side="left", padx=(0, 10), pady=10)
 
     # ── Área principal: editor + paneles derechos ────────────────────────────
@@ -863,20 +875,13 @@ class BeatScriptIDE(ctk.CTk):
         self.current_ast = ast_activo
         if ast_activo is not None:
             self._mostrar_ast(ast_activo)
-            
-            from beatscript.tac_gen import (
-                TACGenerator,
-                format_quads,
-                format_triples,
-                quads_to_triples
-            )
+
+            from beatscript.tac_gen import TACGenerator
 
             prologue, routines, schedule = TACGenerator(ast_activo).generate()
-
-            for r in routines:
-                print(r.name, "->", schedule[r.name])
-                print(format_quads(r.quads))
-                print(format_triples(quads_to_triples(r.quads)))
+            self.tac_routines = routines
+            self.tac_schedule = schedule
+            self._log(f"  Código de tres direcciones generado — {len(routines)} rutina(s).")
 
         try:
             from beatscript.midi_gen import tokens_to_midi_documents
@@ -1221,6 +1226,150 @@ class BeatScriptIDE(ctk.CTk):
             command=ventana.destroy,
         ).pack(pady=(0, 12))
 
+    def _mostrar_tac_visual(self):
+        if not self.tac_routines:
+            self._log(
+                "  Primero compila el código correctamente para "
+                "generar el código de tres direcciones."
+            )
+            return
+
+        from beatscript.tac_gen import (
+            quads_to_triples,
+            quads_to_table_rows,
+            triples_to_table_rows,
+        )
+
+        ventana = ctk.CTkToplevel(self)
+        ventana.title("Codigo de Tres Direcciones - BeatScript")
+        ventana.geometry("800x600")
+        ventana.resizable(True, True)
+
+        # transient() + grab_set() retrasado evita el "zoom" de la ventana
+        # principal al abrir el modal (glitch conocido de CTkToplevel).
+        ventana.transient(self)
+
+        self.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 800) // 2
+        y = self.winfo_y() + (self.winfo_height() - 600) // 2
+        ventana.geometry(f"800x600+{x}+{y}")
+        ventana.after(50, ventana.grab_set)
+
+        header = ctk.CTkFrame(ventana, fg_color="transparent")
+        header.pack(fill="x", padx=24, pady=(18, 4))
+        header.columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            header,
+            text="Codigo de Tres Direcciones",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color="#90caf9",
+        ).grid(row=0, column=0, sticky="w")
+
+        # ── Selector de rutina ─────────────────────────────────────────────
+        selector_frame = ctk.CTkFrame(ventana, fg_color="transparent")
+        selector_frame.pack(fill="x", padx=24, pady=(0, 8))
+        ctk.CTkLabel(
+            selector_frame, text="Rutina:", font=ctk.CTkFont(size=12)
+        ).pack(side="left", padx=(0, 8))
+
+        nombres_rutinas = [r.name for r in self.tac_routines]
+        rutina_var = tk.StringVar(value=nombres_rutinas[0])
+        rutina_menu = ctk.CTkOptionMenu(
+            selector_frame,
+            values=nombres_rutinas,
+            variable=rutina_var,
+            command=lambda _=None: _refrescar_tablas(),
+            width=220,
+        )
+        rutina_menu.pack(side="left")
+
+        # ── Pestañas tipo hoja de Excel: Cuadruplos | Tripletas ─────────────
+        # Reutiliza el estilo "Token.Treeview" ya configurado en
+        # _build_token_panel — NO se vuelve a llamar theme_use() aquí.
+        tabs = ttk.Notebook(ventana)
+        tabs.pack(fill="both", expand=True, padx=24, pady=(0, 8))
+
+        tab_quad = tk.Frame(tabs, bg="#1e1e1e")
+        tab_triple = tk.Frame(tabs, bg="#1e1e1e")
+        tabs.add(tab_quad, text="  Cuadruplos  ")
+        tabs.add(tab_triple, text="  Tripletas  ")
+
+        def _crear_tabla(parent, columnas, encabezados, anchos):
+            cont = tk.Frame(parent, bg="#1e1e1e")
+            cont.pack(fill="both", expand=True, padx=8, pady=8)
+            cont.rowconfigure(0, weight=1)
+            cont.columnconfigure(0, weight=1)
+
+            tree = ttk.Treeview(
+                cont, columns=columnas, show="headings",
+                style="Token.Treeview", selectmode="browse",
+            )
+            for c, h, w in zip(columnas, encabezados, anchos):
+                tree.heading(c, text=h)
+                tree.column(c, width=w, anchor="center" if c == "num" else "w",
+                            stretch=(c != "num"))
+            tree.tag_configure("par", background="#252525")
+            tree.tag_configure("impar", background="#1e1e1e")
+
+            v = ttk.Scrollbar(cont, orient="vertical", command=tree.yview)
+            h_ = ttk.Scrollbar(cont, orient="horizontal", command=tree.xview)
+            tree.configure(yscrollcommand=v.set, xscrollcommand=h_.set)
+            tree.grid(row=0, column=0, sticky="nsew")
+            v.grid(row=0, column=1, sticky="ns")
+            h_.grid(row=1, column=0, sticky="ew")
+            return tree
+
+        tac_tree_quad = _crear_tabla(
+            tab_quad,
+            ("num", "op", "arg1", "arg2", "result"),
+            ("#", "OP", "ARG1", "ARG2", "RESULTADO"),
+            (50, 110, 150, 150, 150),
+        )
+        tac_tree_triple = _crear_tabla(
+            tab_triple,
+            ("num", "op", "arg1", "arg2"),
+            ("(#)", "OP", "ARG1", "ARG2"),
+            (60, 110, 180, 180),
+        )
+
+        def _rutina_actual():
+            nombre = rutina_var.get()
+            return next(
+                (r for r in self.tac_routines if r.name == nombre),
+                self.tac_routines[0],
+            )
+
+        def _refrescar_tablas():
+            rutina = _rutina_actual()
+
+            for item in tac_tree_quad.get_children():
+                tac_tree_quad.delete(item)
+            for i, fila in enumerate(quads_to_table_rows(rutina.quads)):
+                tag = "par" if i % 2 == 0 else "impar"
+                tac_tree_quad.insert("", "end", values=fila, tags=(tag,))
+
+            for item in tac_tree_triple.get_children():
+                tac_tree_triple.delete(item)
+            triples = quads_to_triples(rutina.quads)
+            for i, fila in enumerate(triples_to_table_rows(triples)):
+                tag = "par" if i % 2 == 0 else "impar"
+                valores = list(fila)
+                valores[0] = f"({valores[0]})"
+                tac_tree_triple.insert("", "end", values=valores, tags=(tag,))
+
+        _refrescar_tablas()
+
+        ctk.CTkButton(
+            ventana,
+            text="Cerrar",
+            fg_color="#37474f",
+            hover_color="#455a64",
+            width=110,
+            command=ventana.destroy,
+        ).pack(pady=(0, 16))
+        
+
     def _detener(self):
         """Detiene la reproducción de audio MIDI en curso."""
         pygame.mixer.music.stop()
@@ -1322,11 +1471,3 @@ if __name__ == "__main__":
     app.mainloop()
 
 
-# Codigo de tres direcciones 
-from beatscript.tac_gen import TACGenerator, format_quads, format_triples, quads_to_triples
-
-prologue, routines, schedule = TACGenerator(ast).generate()
-for r in routines:
-    print(r.name, "->", schedule[r.name])
-    print(format_quads(r.quads))
-    print(format_triples(quads_to_triples(r.quads)))
