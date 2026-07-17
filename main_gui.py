@@ -16,6 +16,7 @@ Framework: customtkinter (tema oscuro) + tkinter.ttk (tablas Treeview)
 Audio:      pygame.mixer para reproducir el archivo MIDI generado
 """
 
+import ast
 import tkinter as tk
 from tkinter import ttk, filedialog
 import customtkinter as ctk
@@ -862,6 +863,20 @@ class BeatScriptIDE(ctk.CTk):
         self.current_ast = ast_activo
         if ast_activo is not None:
             self._mostrar_ast(ast_activo)
+            
+            from beatscript.tac_gen import (
+                TACGenerator,
+                format_quads,
+                format_triples,
+                quads_to_triples
+            )
+
+            prologue, routines, schedule = TACGenerator(ast_activo).generate()
+
+            for r in routines:
+                print(r.name, "->", schedule[r.name])
+                print(format_quads(r.quads))
+                print(format_triples(quads_to_triples(r.quads)))
 
         try:
             from beatscript.midi_gen import tokens_to_midi_documents
@@ -1305,3 +1320,13 @@ track melodia {
 if __name__ == "__main__":
     app = BeatScriptIDE()
     app.mainloop()
+
+
+# Codigo de tres direcciones 
+from beatscript.tac_gen import TACGenerator, format_quads, format_triples, quads_to_triples
+
+prologue, routines, schedule = TACGenerator(ast).generate()
+for r in routines:
+    print(r.name, "->", schedule[r.name])
+    print(format_quads(r.quads))
+    print(format_triples(quads_to_triples(r.quads)))
