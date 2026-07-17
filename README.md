@@ -13,7 +13,6 @@ Nombre del proyecto:
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)
 ![Status](https://img.shields.io/badge/estado-en%20desarrollo-yellow)
-![License](https://img.shields.io/badge/licencia-MIT-green)
 
 BeatScript es un compilador para un lenguaje de dominio específico (DSL) pensado para componer música:
 traduce código fuente legible por humanos directamente a un archivo .mid reproducible, 
@@ -121,6 +120,7 @@ y si el código no tiene errores se genera `output.mid` y se reproduce automáti
 ## Referencia del lenguaje
 
 | Instrucción | Descripción |
+|---|---|
 | `tempo N` | Velocidad en BPM (20-300) |
 | `volume N` | Volumen / velocity MIDI (0-127); global o dentro de un track |
 | `pan N` | Paneo estéreo (0 = izquierda, 127 = derecha) |
@@ -135,7 +135,7 @@ y si el código no tiene errores se genera `output.mid` y se reproduce automáti
 | `acento [N] { }` | Sube el volumen del bloque (valor explícito o +20 automático) |
 | `secuencia { (a,b), c }` | Grupos entre paréntesis suenan en paralelo; separados por coma, en secuencia |
 
-
+Duraciones válidas: `redonda`, `blanca`, `negra`, `corchea`, `semicorchea`, `fusa`, `semifusa`, y su variante con puntillo agregando `_punto` (ej. `negra_punto`).
 Duraciones válidas: `redonda`, `blanca`, `negra`, `corchea`, `semicorchea`, `fusa`, `semifusa`, 
 y su variante con puntillo agregando `_punto` (ej. `negra_punto`).
 
