@@ -164,8 +164,3 @@ beatscript2/
     ├── semantic.py       (Etapa 3 - analisis semantico, dos pasadas)
     └── midi_gen.py       (generacion del archivo .mid)
 ```
-
-
-## Licencia
-
-Este proyecto usa licencia MIT (ajústala si tu materia requiere otra). Ver `LICENSE`.
