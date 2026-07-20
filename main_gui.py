@@ -66,6 +66,7 @@ class BeatScriptIDE(ctk.CTk):
         self.current_ast = None
         self.tac_routines = []
         self.tac_schedule = {}
+        self.prologue_tac = None
         self._tab_spaces = 2
 
         self._build_toolbar()
@@ -881,6 +882,7 @@ class BeatScriptIDE(ctk.CTk):
             prologue, routines, schedule = TACGenerator(ast_activo).generate()
             self.tac_routines = routines
             self.tac_schedule = schedule
+            self.prologue_tac = prologue
             self._log(f"  Código de tres direcciones generado — {len(routines)} rutina(s).")
 
         try:
@@ -1238,6 +1240,9 @@ class BeatScriptIDE(ctk.CTk):
             quads_to_triples,
             quads_to_table_rows,
             triples_to_table_rows,
+            format_quads,
+            format_triples,
+            format_code,
         )
 
         ventana = ctk.CTkToplevel(self)
@@ -1284,16 +1289,28 @@ class BeatScriptIDE(ctk.CTk):
         )
         rutina_menu.pack(side="left")
 
-        # ── Pestañas tipo hoja de Excel: Cuadruplos | Tripletas ─────────────
+        # ── Pestañas: Código (notación lineal) | Cuadruplos | Tripletas ─────
         # Reutiliza el estilo "Token.Treeview" ya configurado en
         # _build_token_panel — NO se vuelve a llamar theme_use() aquí.
         tabs = ttk.Notebook(ventana)
         tabs.pack(fill="both", expand=True, padx=24, pady=(0, 8))
 
+        tab_codigo = tk.Frame(tabs, bg="#1e1e1e")
         tab_quad = tk.Frame(tabs, bg="#1e1e1e")
         tab_triple = tk.Frame(tabs, bg="#1e1e1e")
+        tabs.add(tab_codigo, text="  Codigo  ")
         tabs.add(tab_quad, text="  Cuadruplos  ")
         tabs.add(tab_triple, text="  Tripletas  ")
+
+        # Vista de código en notación lineal: t1 = y * z
+        codigo_box = ctk.CTkTextbox(
+            tab_codigo,
+            font=("Consolas", 13),
+            fg_color="#1e1e1e",
+            text_color="#d4d4d4",
+            wrap="none",
+        )
+        codigo_box.pack(fill="both", expand=True, padx=8, pady=8)
 
         def _crear_tabla(parent, columnas, encabezados, anchos):
             cont = tk.Frame(parent, bg="#1e1e1e")
@@ -1343,6 +1360,11 @@ class BeatScriptIDE(ctk.CTk):
         def _refrescar_tablas():
             rutina = _rutina_actual()
 
+            codigo_box.configure(state="normal")
+            codigo_box.delete("1.0", "end")
+            codigo_box.insert("1.0", format_code(rutina.quads))
+            codigo_box.configure(state="disabled")
+
             for item in tac_tree_quad.get_children():
                 tac_tree_quad.delete(item)
             for i, fila in enumerate(quads_to_table_rows(rutina.quads)):
@@ -1360,14 +1382,60 @@ class BeatScriptIDE(ctk.CTk):
 
         _refrescar_tablas()
 
+        # ── Exportar el codigo de tres direcciones de TODAS las rutinas ────
+        def _exportar_txt():
+            ruta = filedialog.asksaveasfilename(
+                title="Guardar codigo de tres direcciones",
+                defaultextension=".txt",
+                initialfile="tac_beatscript.txt",
+                filetypes=[
+                    ("Archivos de texto", "*.txt"),
+                    ("Todos los archivos", "*.*"),
+                ],
+            )
+            if not ruta:
+                return  # El usuario canceló
+
+            bloques = []
+            if self.prologue_tac and self.prologue_tac.quads:
+                bloques.append(
+                    f"=== Rutina: {self.prologue_tac.name} ===\n\n"
+                    f"{format_code(self.prologue_tac.quads)}\n"
+                )
+            for r in self.tac_routines:
+                bloques.append(
+                    f"=== Rutina: {r.name} ===\n\n"
+                    f"{format_code(r.quads)}\n"
+                )
+            contenido = "\n".join(bloques)
+
+            try:
+                with open(ruta, "w", encoding="utf-8") as f:
+                    f.write(contenido)
+                self._log(f"Codigo de tres direcciones exportado a: {ruta}")
+            except Exception as e:
+                self._log(f"Error al exportar el codigo de tres direcciones: {e}")
+
+        botones_frame = ctk.CTkFrame(ventana, fg_color="transparent")
+        botones_frame.pack(pady=(0, 16))
+
         ctk.CTkButton(
-            ventana,
+            botones_frame,
+            text="Generar txt",
+            fg_color="#2e7d32",
+            hover_color="#388e3c",
+            width=140,
+            command=_exportar_txt,
+        ).pack(side="left", padx=(0, 12))
+
+        ctk.CTkButton(
+            botones_frame,
             text="Cerrar",
             fg_color="#37474f",
             hover_color="#455a64",
             width=110,
             command=ventana.destroy,
-        ).pack(pady=(0, 16))
+        ).pack(side="left")
         
 
     def _detener(self):
@@ -1469,5 +1537,3 @@ track melodia {
 if __name__ == "__main__":
     app = BeatScriptIDE()
     app.mainloop()
-
-

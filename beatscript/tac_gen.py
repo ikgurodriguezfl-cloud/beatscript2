@@ -393,3 +393,45 @@ def format_triples(triples: list) -> str:
     lines = [f"{i:>3}: ({op}, {a1}, {a2})" for i, (op, a1, a2) in enumerate(triples)]
     return "\n".join(lines)
 
+
+# ── Código de tres direcciones en notación lineal (x = y op z) ─────────
+# Esta es la representación "de libro de texto" del código intermedio:
+# una instrucción por línea, con a lo más un operador del lado derecho.
+# Distinta de los cuádruplos/tripletas de arriba, que son solo formas
+# tabulares equivalentes pensadas para mostrarse en un Treeview.
+
+_BIN_SYMBOL = {"ADD": "+", "SUB": "-", "MUL": "*"}
+
+
+def quad_to_statement(q: Quad) -> str:
+    """Convierte un único cuádruplo a su instrucción de tres direcciones."""
+    if q.op == "MOV":
+        return f"{q.result} = {q.arg1}"
+    if q.op in _BIN_SYMBOL:
+        return f"{q.result} = {q.arg1} {_BIN_SYMBOL[q.op]} {q.arg2}"
+    if q.op == "MIN":
+        return f"{q.result} = min({q.arg1}, {q.arg2})"
+    if q.op == "LT":
+        return f"{q.result} = {q.arg1} < {q.arg2}"
+    if q.op == "LABEL":
+        return f"{q.arg1}:"
+    if q.op == "GOTO":
+        return f"goto {q.arg1}"
+    if q.op == "IFFALSE":
+        return f"if not {q.arg1} goto {q.arg2}"
+    if q.op == "PARAM":
+        return f"param {q.arg1}"
+    if q.op == "CALL":
+        return f"call {q.arg1}, {q.arg2}"
+    return f"{q.op} {q.arg1}, {q.arg2}, {q.result}"
+
+
+def quads_to_code_lines(quads: list) -> list:
+    """Lista de (num, instrucción_texto) para mostrar en una vista tipo editor."""
+    return [(i, quad_to_statement(q)) for i, q in enumerate(quads)]
+
+
+def format_code(quads: list) -> str:
+    """Bloque de texto con el código de tres direcciones en notación lineal."""
+    lines = [f"{i:>3}:  {quad_to_statement(q)}" for i, q in enumerate(quads)]
+    return "\n".join(lines)
