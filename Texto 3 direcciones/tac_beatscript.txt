@@ -1,0 +1,175 @@
+=== Rutina: _global ===
+
+  0:  param 110
+  1:  param 0.0
+  2:  call set_tempo, 2
+
+=== Rutina: melodia ===
+
+  0:  melodia_t = 0.0
+  1:  melodia_vel = 80
+  2:  melodia_prog = 40
+  3:  melodia_pan = 64
+  4:  melodia_transp = 0
+  5:  param melodia_prog
+  6:  param 0
+  7:  param melodia_t
+  8:  call set_program, 3
+  9:  param melodia_pan
+ 10:  param 0
+ 11:  param melodia_t
+ 12:  call set_pan, 3
+ 13:  melodia_oct1 = 4 + 1
+ 14:  melodia_mul1 = melodia_oct1 * 12
+ 15:  melodia_pitch1 = 4 + melodia_mul1
+ 16:  melodia_pitch2 = melodia_pitch1 + melodia_transp
+ 17:  param melodia_pitch2
+ 18:  param 1.0
+ 19:  param melodia_vel
+ 20:  param 0
+ 21:  param melodia_t
+ 22:  call emit_note, 5
+ 23:  melodia_t = melodia_t + 1.0
+ 24:  melodia_oct2 = 4 + 1
+ 25:  melodia_mul2 = melodia_oct2 * 12
+ 26:  melodia_pitch3 = 4 + melodia_mul2
+ 27:  melodia_pitch4 = melodia_pitch3 + melodia_transp
+ 28:  param melodia_pitch4
+ 29:  param 1.0
+ 30:  param melodia_vel
+ 31:  param 0
+ 32:  param melodia_t
+ 33:  call emit_note, 5
+ 34:  melodia_t = melodia_t + 1.0
+ 35:  melodia_oct3 = 4 + 1
+ 36:  melodia_mul3 = melodia_oct3 * 12
+ 37:  melodia_pitch5 = 5 + melodia_mul3
+ 38:  melodia_pitch6 = melodia_pitch5 + melodia_transp
+ 39:  param melodia_pitch6
+ 40:  param 1.0
+ 41:  param melodia_vel
+ 42:  param 0
+ 43:  param melodia_t
+ 44:  call emit_note, 5
+ 45:  melodia_t = melodia_t + 1.0
+ 46:  melodia_oct4 = 4 + 1
+ 47:  melodia_mul4 = melodia_oct4 * 12
+ 48:  melodia_pitch7 = 7 + melodia_mul4
+ 49:  melodia_pitch8 = melodia_pitch7 + melodia_transp
+ 50:  param melodia_pitch8
+ 51:  param 1.0
+ 52:  param melodia_vel
+ 53:  param 0
+ 54:  param melodia_t
+ 55:  call emit_note, 5
+ 56:  melodia_t = melodia_t + 1.0
+ 57:  melodia_oct5 = 4 + 1
+ 58:  melodia_mul5 = melodia_oct5 * 12
+ 59:  melodia_pitch9 = 7 + melodia_mul5
+ 60:  melodia_pitch10 = melodia_pitch9 + melodia_transp
+ 61:  param melodia_pitch10
+ 62:  param 1.0
+ 63:  param melodia_vel
+ 64:  param 0
+ 65:  param melodia_t
+ 66:  call emit_note, 5
+ 67:  melodia_t = melodia_t + 1.0
+ 68:  melodia_oct6 = 4 + 1
+ 69:  melodia_mul6 = melodia_oct6 * 12
+ 70:  melodia_pitch11 = 5 + melodia_mul6
+ 71:  melodia_pitch12 = melodia_pitch11 + melodia_transp
+ 72:  param melodia_pitch12
+ 73:  param 1.0
+ 74:  param melodia_vel
+ 75:  param 0
+ 76:  param melodia_t
+ 77:  call emit_note, 5
+ 78:  melodia_t = melodia_t + 1.0
+ 79:  melodia_oct7 = 4 + 1
+ 80:  melodia_mul7 = melodia_oct7 * 12
+ 81:  melodia_pitch13 = 4 + melodia_mul7
+ 82:  melodia_pitch14 = melodia_pitch13 + melodia_transp
+ 83:  param melodia_pitch14
+ 84:  param 1.0
+ 85:  param melodia_vel
+ 86:  param 0
+ 87:  param melodia_t
+ 88:  call emit_note, 5
+ 89:  melodia_t = melodia_t + 1.0
+ 90:  melodia_oct8 = 4 + 1
+ 91:  melodia_mul8 = melodia_oct8 * 12
+ 92:  melodia_pitch15 = 2 + melodia_mul8
+ 93:  melodia_pitch16 = melodia_pitch15 + melodia_transp
+ 94:  param melodia_pitch16
+ 95:  param 1.0
+ 96:  param melodia_vel
+ 97:  param 0
+ 98:  param melodia_t
+ 99:  call emit_note, 5
+100:  melodia_t = melodia_t + 1.0
+101:  melodia_oct9 = 4 + 1
+102:  melodia_mul9 = melodia_oct9 * 12
+103:  melodia_pitch17 = 0 + melodia_mul9
+104:  melodia_pitch18 = melodia_pitch17 + melodia_transp
+105:  param melodia_pitch18
+106:  param 1.0
+107:  param melodia_vel
+108:  param 0
+109:  param melodia_t
+110:  call emit_note, 5
+111:  melodia_t = melodia_t + 1.0
+112:  melodia_oct10 = 4 + 1
+113:  melodia_mul10 = melodia_oct10 * 12
+114:  melodia_pitch19 = 0 + melodia_mul10
+115:  melodia_pitch20 = melodia_pitch19 + melodia_transp
+116:  param melodia_pitch20
+117:  param 1.0
+118:  param melodia_vel
+119:  param 0
+120:  param melodia_t
+121:  call emit_note, 5
+122:  melodia_t = melodia_t + 1.0
+123:  melodia_oct11 = 4 + 1
+124:  melodia_mul11 = melodia_oct11 * 12
+125:  melodia_pitch21 = 2 + melodia_mul11
+126:  melodia_pitch22 = melodia_pitch21 + melodia_transp
+127:  param melodia_pitch22
+128:  param 1.0
+129:  param melodia_vel
+130:  param 0
+131:  param melodia_t
+132:  call emit_note, 5
+133:  melodia_t = melodia_t + 1.0
+134:  melodia_oct12 = 4 + 1
+135:  melodia_mul12 = melodia_oct12 * 12
+136:  melodia_pitch23 = 4 + melodia_mul12
+137:  melodia_pitch24 = melodia_pitch23 + melodia_transp
+138:  param melodia_pitch24
+139:  param 1.0
+140:  param melodia_vel
+141:  param 0
+142:  param melodia_t
+143:  call emit_note, 5
+144:  melodia_t = melodia_t + 1.0
+145:  melodia_oct13 = 4 + 1
+146:  melodia_mul13 = melodia_oct13 * 12
+147:  melodia_pitch25 = 4 + melodia_mul13
+148:  melodia_pitch26 = melodia_pitch25 + melodia_transp
+149:  param melodia_pitch26
+150:  param 2.0
+151:  param melodia_vel
+152:  param 0
+153:  param melodia_t
+154:  call emit_note, 5
+155:  melodia_t = melodia_t + 2.0
+156:  melodia_oct14 = 4 + 1
+157:  melodia_mul14 = melodia_oct14 * 12
+158:  melodia_pitch27 = 2 + melodia_mul14
+159:  melodia_pitch28 = melodia_pitch27 + melodia_transp
+160:  param melodia_pitch28
+161:  param 2.0
+162:  param melodia_vel
+163:  param 0
+164:  param melodia_t
+165:  call emit_note, 5
+166:  melodia_t = melodia_t + 2.0
